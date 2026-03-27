@@ -22,6 +22,23 @@ pip install -e '.[telegram,dev]'
 
 - `TELEGRAM_API_ID`: required for `auth_telegram.py`, `collect_messages.py`, and `finalize_run.py --mark-read`
 - `TELEGRAM_API_HASH`: required for `auth_telegram.py`, `collect_messages.py`, and `finalize_run.py --mark-read`
+- `TELEGRAM_PHONE`: optional for `auth_telegram.py`; if set, the auth flow uses it instead of prompting for the phone number
+- `TELEGRAM_PASSWORD`: optional for `auth_telegram.py`; if set, the auth flow uses it for Telegram two-step verification instead of prompting for the password
+
+You can provide these either through the shell environment or a local ignored env file. The loader checks, in order:
+
+- `.secrets/telegram.env`
+- `.env.local`
+- `.env`
+
+Shell environment variables take precedence over file-based values. Example `.secrets/telegram.env`:
+
+```bash
+TELEGRAM_API_ID=123456
+TELEGRAM_API_HASH=your_hash_here
+TELEGRAM_PHONE=+34123456789
+TELEGRAM_PASSWORD=your_2fa_password
+```
 
 Optional environment variables:
 
@@ -43,6 +60,8 @@ Run the one-time interactive authentication flow:
 ```bash
 python3 scripts/auth_telegram.py
 ```
+
+If `TELEGRAM_PHONE` is configured, the script skips the phone-number prompt. If `TELEGRAM_PASSWORD` is also configured, the script also skips the Telegram 2FA password prompt and only asks for the one-time login code.
 
 This creates a local Telethon session under `data/sessions/`. Session files are sensitive credentials and must never be committed.
 

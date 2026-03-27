@@ -33,6 +33,9 @@ If implementation-specific docs are later added under `docs/`, prefer the most s
 ## Security Notes
 
 - Telethon session files are sensitive credentials and must never be committed.
+- Preferred local secret file for Telegram credentials is `.secrets/telegram.env` when shell exports are not practical.
+- `TELEGRAM_PHONE` may be stored alongside API credentials to avoid interactive phone-number prompts during auth bootstrap.
+- `TELEGRAM_PASSWORD` may be stored alongside API credentials when Telegram two-step verification is enabled.
 - Do not print full raw message dumps into logs unless explicitly required for debugging.
 - Keep secrets in environment variables or local ignored files only.
 

@@ -28,6 +28,9 @@ The current repository includes a first working version of the local pipeline: T
 - Design for concurrent automation runs across multiple Telegram targets
 - Separate data collection from summarization so collection can be tested independently
 - Prefer explicit run identifiers and target identifiers over implicit global state
+- Keep Telegram secrets in environment variables or local ignored env files such as `.secrets/telegram.env`
+- Allow auth bootstrap to source the Telegram phone number from local config to reduce interactive setup friction
+- Allow auth bootstrap to source the Telegram 2FA password from local config when two-step verification is enabled
 
 ## Next Document to Read
 

@@ -18,8 +18,11 @@ async def main() -> None:
     configure_logging(config.log_level)
 
     client = create_telethon_client(config, session_name=args.session_name)
-    async with client:
-        await client.start()
+    await client.connect()
+    try:
+        await client.start(phone=config.telegram_phone, password=config.telegram_password)
+    finally:
+        await client.disconnect()
 
 
 if __name__ == "__main__":
