@@ -1,0 +1,83 @@
+# AGENTS.md
+
+## Project Overview
+
+This repository is building toward an automation-oriented Telegram group summarizer. Agents running here are expected to help implement and operate a pipeline that:
+
+- collects Telegram messages through local Python scripts
+- stores normalized message data in local SQLite
+- prepares agent-friendly summary input
+- produces a concise report with signal extraction
+- finalizes the run by marking the Telegram target as read and purging staged raw data
+
+The repository now contains a working local pipeline. Read the documentation before writing code.
+
+## Required Reading Order
+
+1. `PROJECT_OVERVIEW.md`
+2. `docs/specification.md`
+3. `user_guide.md`
+
+If implementation-specific docs are later added under `docs/`, prefer the most specific document relevant to the task.
+
+## Working Rules
+
+- Treat `docs/specification.md` as the current source of truth for scope and architecture.
+- Keep data collection separate from summarization logic.
+- Do not add hidden constants for Telegram targets, secrets, or local paths.
+- Prefer explicit CLI arguments and environment variables.
+- Keep raw Telegram data retention minimal.
+- Do not mark Telegram messages as read until a report has been successfully produced.
+- Do not purge staged raw data on failed runs.
+
+## Security Notes
+
+- Telethon session files are sensitive credentials and must never be committed.
+- Do not print full raw message dumps into logs unless explicitly required for debugging.
+- Keep secrets in environment variables or local ignored files only.
+
+## Expected Repository Areas
+
+- `scripts/`: runnable entrypoints for auth, collection, preparation, finalization, and maintenance
+- `src/`: reusable Python package code
+- `docs/`: implementation and operations documents
+- `data/`: local runtime data such as SQLite databases, report outputs, and session files
+- `logs/`: local execution logs
+
+## Commands
+
+Environment setup:
+
+- `python3 -m venv .venv && source .venv/bin/activate`
+- `pip install -e '.[telegram,dev]'`
+
+Test commands:
+
+- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
+
+Lint and format commands:
+
+- `python3 -m ruff check src scripts tests`
+- `python3 -m ruff format src scripts tests`
+
+Standard local run flow:
+
+- `python3 scripts/auth_telegram.py`
+- `python3 scripts/collect_messages.py --target <target> --lookback-hours 24 --max-messages 500`
+- `python3 scripts/prepare_summary_input.py --run-id <run_id> --format both --output data/reports/<run_id>.summary`
+- Agent writes the final report and stores it with `python3 scripts/store_report.py --run-id <run_id> --input-path <report.md>`
+- `python3 scripts/finalize_run.py --run-id <run_id> --mark-read --purge-raw`
+
+Minimum pre-merge validation:
+
+- Run `PYTHONPATH=src python3 -m unittest discover -s tests -v`
+- Run `python3 -m compileall src scripts tests`
+- Run `python3 -m ruff check src scripts tests`
+
+## Agent Guidance
+
+- For planning work, update documentation first.
+- For implementation work, add or update tests for the behavior you change.
+- When you change project structure or operating conventions, update both `PROJECT_OVERVIEW.md` and `AGENTS.md`.
+- If a task concerns Telegram semantics, storage contracts, or cleanup behavior, check the specification before making assumptions.
+- Alias mapping currently lives in `report_targets.target_key`. Existing rows take precedence over username parsing during target resolution.
