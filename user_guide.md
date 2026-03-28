@@ -160,6 +160,8 @@ python3 scripts/finalize_run.py --run-id <RUN_ID> --mark-read --purge-raw
 Example final-report shape:
 
 ```markdown
+Source target: Team Alpha (channel, target key: team_alpha)
+
 # Headline summary
 
 Two or three sentences on the most useful outcomes from the chat.

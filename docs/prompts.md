@@ -4,6 +4,10 @@
 
 Use this section order in the final report:
 
+Source line before the sections:
+- Name the Telegram group or channel the report summarizes.
+- Prefer the prepared target metadata, for example `Source target: Team Alpha (channel, target key: team_alpha)`.
+
 1. Headline summary
 2. Why this matters
 3. Key topics and signals
@@ -24,6 +28,7 @@ Goals:
 - Focus on what is most useful or important for the reader.
 
 Output format:
+Source target line naming the Telegram group or channel.
 1. Headline summary
 2. Why this matters
 3. Key topics and signals
@@ -33,6 +38,7 @@ Output format:
 
 Rules:
 - Work only from the prepared bundle unless web research is explicitly justified.
+- Do not omit the source target; the final report should say which Telegram group or channel it summarizes.
 - If the bundle is empty, say so plainly and avoid inventing significance.
 - Quote sparingly and only when a short excerpt materially improves accuracy.
 - If a claim depends on weak evidence in the message stream, label it low confidence.
@@ -48,6 +54,8 @@ Rules:
 You are summarizing one Telegram target from a prepared local bundle.
 
 Write a concise report that highlights the most important information, preserves useful concrete details when needed, and clearly labels uncertainty.
+
+Begin with a source line that names the Telegram group or channel from the prepared bundle.
 
 Do not try to retell the full message stream. Read the prepared bundle, decide what matters, and keep the report focused.
 ```

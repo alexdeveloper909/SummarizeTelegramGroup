@@ -109,6 +109,10 @@ class SummaryInputTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("candidate_urls", bundle_json)
         self.assertIn("sender_stats", bundle_json)
         self.assertIn("# Summary Input for Team Alpha", markdown)
+        self.assertIn("## Target Metadata", markdown)
+        self.assertIn("- Display Name: Team Alpha", markdown)
+        self.assertIn("- Target Key: team_alpha", markdown)
+        self.assertIn("- Entity Type: channel", markdown)
         self.assertIn("Full Chronological Messages", markdown)
 
     async def test_empty_run_behavior_is_supported(self) -> None:

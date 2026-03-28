@@ -123,6 +123,8 @@ class ReportContextTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(Path(str(result["summary_json_path"])).exists())
         self.assertTrue(Path(str(result["summary_markdown_path"])).exists())
         self.assertTrue(Path(str(result["report_prompt_path"])).exists())
+        prompt_text = Path(str(result["report_prompt_path"])).read_text(encoding="utf-8")
+        self.assertIn("Source Target Display Name: Team Alpha", prompt_text)
 
 
 if __name__ == "__main__":

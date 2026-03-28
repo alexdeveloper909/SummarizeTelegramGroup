@@ -104,6 +104,12 @@ def bundle_to_markdown(bundle: SummaryBundle) -> str:
     lines = [
         f"# Summary Input for {bundle.target['display_name']}",
         "",
+        "## Target Metadata",
+        f"- Display Name: {bundle.target['display_name']}",
+        f"- Target Key: {bundle.target['target_key']}",
+        f"- Entity Type: {bundle.target['telegram_entity_type'] or 'unknown'}",
+        f"- Telegram Entity ID: {bundle.target['telegram_entity_id'] or 'unknown'}",
+        "",
         "## Run Metadata",
         f"- Run ID: {bundle.run['run_id']}",
         f"- Status: {bundle.run['status']}",

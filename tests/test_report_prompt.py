@@ -117,6 +117,9 @@ class ReportPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("2. Candidate URLs", prompt)
         self.assertIn("## Candidate URLs", prompt)
         self.assertIn("## Sender Statistics", prompt)
+        self.assertIn("Start the report with one source line", prompt)
+        self.assertIn("Source Target Display Name: Team Alpha", prompt)
+        self.assertIn("Source Target Key: team_alpha", prompt)
         self.assertIn("## Final Reminder", prompt)
 
     async def test_write_report_prompt_persists_output(self) -> None:
@@ -160,7 +163,9 @@ class ReportPromptTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(output_path.name.endswith(".report_prompt.md"))
         self.assertTrue(output_path.exists())
-        self.assertIn("Report Writing Brief", output_path.read_text(encoding="utf-8"))
+        prompt_text = output_path.read_text(encoding="utf-8")
+        self.assertIn("Report Writing Brief", prompt_text)
+        self.assertIn("Do not omit the source target", prompt_text)
 
 
 if __name__ == "__main__":
