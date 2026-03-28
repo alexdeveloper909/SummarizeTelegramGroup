@@ -3,16 +3,14 @@ from __future__ import annotations
 import tempfile
 import unittest
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 from telegram_group_summarizer.collection import collect_messages_for_run
 from telegram_group_summarizer.config import AppConfig
-from telegram_group_summarizer.db import count_raw_messages, ensure_database, get_run
-from telegram_group_summarizer.finalization import finalize_run
+from telegram_group_summarizer.db import ensure_database
 from telegram_group_summarizer.models import ResolvedTarget, TargetReference
-from telegram_group_summarizer.report_context import prepare_report_context
-from telegram_group_summarizer.reports import store_report
+from telegram_group_summarizer.report_prompt import build_report_prompt, write_report_prompt
 from telegram_group_summarizer.summary_input import build_summary_bundle
 
 
@@ -29,30 +27,26 @@ class FakeMessage:
     sender_id: int
     sender: FakeSender
     text: str
-    unread: bool = True
+    reply_to_msg_id: int | None = None
+    unread: bool = False
 
 
 class FakeTelegramClient:
-    def __init__(self, resolved_target: ResolvedTarget, unread_messages=None, lookback_messages=None):
+    def __init__(self, resolved_target: ResolvedTarget, lookback_messages=None):
         self.resolved_target = resolved_target
-        self.unread_messages = unread_messages if unread_messages is not None else []
         self.lookback_messages = lookback_messages if lookback_messages is not None else []
-        self.marked_read = []
 
     async def resolve_target(self, reference: TargetReference) -> ResolvedTarget:
         return self.resolved_target
 
     async def fetch_unread_messages(self, target: ResolvedTarget, limit: int):
-        return list(self.unread_messages)[:limit]
+        return []
 
     async def fetch_messages_since(self, target: ResolvedTarget, since: datetime, limit: int):
-        return [message for message in self.lookback_messages if message.date >= since][:limit]
-
-    async def mark_target_read(self, target: ResolvedTarget) -> None:
-        self.marked_read.append(target.target_key)
+        return list(self.lookback_messages)[:limit]
 
 
-class IntegrationFlowTests(unittest.IsolatedAsyncioTestCase):
+class ReportPromptTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         root = Path(self.temp_dir.name)
@@ -77,73 +71,96 @@ class IntegrationFlowTests(unittest.IsolatedAsyncioTestCase):
         self.connection.close()
         self.temp_dir.cleanup()
 
-    async def test_mocked_pipeline_flow(self) -> None:
+    async def test_report_prompt_prioritizes_compact_sections(self) -> None:
         now = datetime.now(timezone.utc)
         resolved_target = ResolvedTarget(
             target_key="team_alpha",
-            entity_id=300,
+            entity_id=201,
             entity_type="channel",
             display_name="Team Alpha",
             reference=TargetReference(kind="username", value="team_alpha"),
         )
-        lookback_messages = [
+        messages = [
             FakeMessage(
                 id=1,
-                date=now - timedelta(minutes=10),
+                date=now,
                 sender_id=1,
                 sender=FakeSender("Alice", "Smith"),
-                text="Alpha update https://alpha.test",
-                unread=False,
+                text="Important update https://docs.test",
             ),
             FakeMessage(
                 id=2,
-                date=now - timedelta(minutes=5),
+                date=now,
                 sender_id=2,
                 sender=FakeSender("Bob", "Jones"),
-                text="Need follow-up",
-                unread=False,
+                text="Second update",
             ),
         ]
-        client = FakeTelegramClient(resolved_target, unread_messages=[], lookback_messages=lookback_messages)
-
-        collect_result = await collect_messages_for_run(
+        client = FakeTelegramClient(resolved_target, lookback_messages=messages)
+        await collect_messages_for_run(
             connection=self.connection,
             telegram_client=client,
             target_value="team_alpha",
             lookback_hours=24,
             max_messages=10,
             config=self.config,
-            run_id="run-integration",
+            run_id="run-report-prompt",
             now=now,
         )
-        bundle = build_summary_bundle(self.connection, "run-integration")
-        context = prepare_report_context(
-            self.connection,
-            run_id="run-integration",
-            config=self.config,
-        )
-        self.assertEqual(2, len(bundle.messages))
-        self.assertEqual("lookback", collect_result["mode"])
-        self.assertTrue(str(context["report_prompt_path"]).endswith(".report_prompt.md"))
 
-        store_report(
-            self.connection,
-            run_id="run-integration",
-            report_markdown="# Headline summary\n\nA concise report.",
-            config=self.config,
+        bundle = build_summary_bundle(self.connection, "run-report-prompt")
+        prompt = build_report_prompt(bundle)
+
+        self.assertIn("# Report Writing Brief", prompt)
+        self.assertIn("## Reading Order", prompt)
+        self.assertIn("1. Run Metadata", prompt)
+        self.assertIn("2. Candidate URLs", prompt)
+        self.assertIn("## Candidate URLs", prompt)
+        self.assertIn("## Sender Statistics", prompt)
+        self.assertIn("## Final Reminder", prompt)
+
+    async def test_write_report_prompt_persists_output(self) -> None:
+        now = datetime.now(timezone.utc)
+        resolved_target = ResolvedTarget(
+            target_key="quiet_room",
+            entity_id=202,
+            entity_type="channel",
+            display_name="Quiet Room",
+            reference=TargetReference(kind="username", value="quiet_room"),
         )
-        finalization_result = await finalize_run(
+        client = FakeTelegramClient(
+            resolved_target,
+            lookback_messages=[
+                FakeMessage(
+                    id=1,
+                    date=now,
+                    sender_id=1,
+                    sender=FakeSender("Alice", "Smith"),
+                    text="Simple update",
+                )
+            ],
+        )
+        await collect_messages_for_run(
             connection=self.connection,
             telegram_client=client,
-            run_id="run-integration",
-            mark_read=True,
-            purge_raw=True,
+            target_value="quiet_room",
+            lookback_hours=24,
+            max_messages=10,
+            config=self.config,
+            run_id="run-report-prompt-write",
+            now=now,
         )
 
-        self.assertEqual(["team_alpha"], client.marked_read)
-        self.assertEqual("finalized", get_run(self.connection, "run-integration")["status"])
-        self.assertEqual(0, count_raw_messages(self.connection, "run-integration"))
-        self.assertTrue(finalization_result["report_output_path"].endswith(".report.md"))
+        bundle = build_summary_bundle(self.connection, "run-report-prompt-write")
+        output_path = write_report_prompt(
+            bundle,
+            output_path=None,
+            reports_dir=self.config.reports_dir,
+        )
+
+        self.assertTrue(output_path.name.endswith(".report_prompt.md"))
+        self.assertTrue(output_path.exists())
+        self.assertIn("Report Writing Brief", output_path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ The user is a member of multiple Telegram groups and does not have time to read 
 ## 3. Goals
 
 - Support scheduled automation runs for one Telegram target per invocation.
-- Collect messages with enough metadata to enable downstream summarization and signal extraction.
+- Collect messages with enough metadata to enable downstream summarization and report writing.
 - Persist collected data locally in SQLite so the summarization stage does not depend on a live Telegram connection.
 - Allow multiple automation runs for different targets at the same time.
 - Produce a final report that can be read quickly during a morning review.
@@ -60,7 +60,7 @@ Daily automation run:
 3. Collector fetches unread messages for the target. If unread state is unavailable or unsuitable, it fetches messages from the last 24 hours, bounded by configurable limits.
 4. Collector writes normalized message records into SQLite, grouped by a unique run ID and target ID.
 5. A preparation script reads the staged records and produces an agent-friendly bundle for summarization.
-6. The agent performs summarization and signal extraction, optionally using web search for deeper investigation when needed.
+6. The agent performs summarization, optionally using web search for deeper investigation when needed.
 7. The agent outputs a report in Markdown or another agreed format.
 8. On successful completion, the pipeline marks the target as read in Telegram and purges staged raw rows for that run.
 
@@ -71,7 +71,7 @@ Daily automation run:
 - The system must collect messages for one configured Telegram target per run.
 - The system must support both unread-message mode and lookback-window mode.
 - The effective fetch scope must never exceed the configured maximum lookback window, defaulting to 24 hours.
-- The collector must capture enough metadata for downstream signal extraction, including:
+- The collector must capture enough metadata for downstream summarization, including:
   - Telegram target ID
   - Message ID
   - Message timestamp
@@ -91,7 +91,7 @@ Daily automation run:
 - Each row must be associated with both a target identifier and a run identifier.
 - The system should keep enough run metadata to debug failures and confirm completion state.
 
-### 8.3 Summarization and Signal Extraction
+### 8.3 Summarization
 
 - The system must expose a local script or agent-friendly data package that lets an AI agent summarize collected messages without calling Telegram again.
 - The summarization stage must produce:
@@ -180,7 +180,9 @@ This separation keeps Telegram access narrow, makes summarization reproducible, 
 ├── scripts/
 │   ├── auth_telegram.py
 │   ├── collect_messages.py
+│   ├── prepare_report_context.py
 │   ├── prepare_summary_input.py
+│   ├── build_report_prompt.py
 │   ├── finalize_run.py
 │   └── purge_old_runs.py
 ├── src/
@@ -190,12 +192,16 @@ This separation keeps Telegram access narrow, makes summarization reproducible, 
 │       ├── models.py
 │       ├── telethon_client.py
 │       ├── collection.py
+│       ├── report_context.py
+│       ├── report_prompt.py
 │       ├── summary_input.py
 │       ├── finalization.py
 │       └── logging_utils.py
 └── tests/
     ├── test_db.py
     ├── test_collection_normalization.py
+    ├── test_report_context.py
+    ├── test_report_prompt.py
     ├── test_prepare_summary_input.py
     └── test_finalization.py
 ```
@@ -358,7 +364,7 @@ Recommended CLI shape:
 
 ```bash
 python scripts/collect_messages.py --target team_alpha --lookback-hours 24 --max-messages 500
-python scripts/prepare_summary_input.py --run-id <RUN_ID> --format markdown
+python scripts/prepare_report_context.py --run-id <RUN_ID>
 python scripts/finalize_run.py --run-id <RUN_ID> --mark-read --purge-raw
 ```
 

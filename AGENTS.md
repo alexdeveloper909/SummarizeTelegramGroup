@@ -7,7 +7,7 @@ This repository is building toward an automation-oriented Telegram group summari
 - collects Telegram messages through local Python scripts
 - stores normalized message data in local SQLite
 - prepares agent-friendly summary input
-- produces a concise report with signal extraction
+- produces a concise report from the prepared data
 - finalizes the run by marking the Telegram target as read and purging staged raw data
 
 The repository now contains a working local pipeline. Read the documentation before writing code.
@@ -39,6 +39,14 @@ If implementation-specific docs are later added under `docs/`, prefer the most s
 - Do not print full raw message dumps into logs unless explicitly required for debugging.
 - Keep secrets in environment variables or local ignored files only.
 
+## Summarization Priorities
+
+- Prefer concise, high-value reporting over exhaustive recap.
+- Surface the most important developments, risks, decisions, requests, deadlines, useful links, and notable context from the prepared data.
+- Preserve concrete details when they materially improve accuracy or usefulness.
+- When several messages describe the same situation, collapse them into one concise signal.
+- When messages conflict or evidence is weak, keep the main report conservative and move uncertain details into uncertainties.
+
 ## Expected Repository Areas
 
 - `scripts/`: runnable entrypoints for auth, collection, preparation, finalization, and maintenance
@@ -67,9 +75,11 @@ Standard local run flow:
 
 - `python3 scripts/auth_telegram.py`
 - `python3 scripts/collect_messages.py --target <target> --lookback-hours 24 --max-messages 500`
-- `python3 scripts/prepare_summary_input.py --run-id <run_id> --format both --output data/reports/<run_id>.summary`
+- `python3 scripts/prepare_report_context.py --run-id <run_id>`
 - Agent writes the final report and stores it with `python3 scripts/store_report.py --run-id <run_id> --input-path <report.md>`
 - `python3 scripts/finalize_run.py --run-id <run_id> --mark-read --purge-raw`
+
+The lower-level scripts `prepare_summary_input.py` and `build_report_prompt.py` remain available for debugging or partial reruns.
 
 Minimum pre-merge validation:
 
@@ -84,3 +94,5 @@ Minimum pre-merge validation:
 - When you change project structure or operating conventions, update both `PROJECT_OVERVIEW.md` and `AGENTS.md`.
 - If a task concerns Telegram semantics, storage contracts, or cleanup behavior, check the specification before making assumptions.
 - Alias mapping currently lives in `report_targets.target_key`. Existing rows take precedence over username parsing during target resolution.
+- When preparing or reviewing report output, rely on the prepared bundle and let the model determine what matters.
+- When writing a final report, use the generated report prompt/brief before falling back to the full bundle.

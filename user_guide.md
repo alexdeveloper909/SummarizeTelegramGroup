@@ -98,6 +98,14 @@ This writes:
 
 If you omit `--output`, the script prints the requested format to stdout.
 
+Preferred combined step:
+
+```bash
+python3 scripts/prepare_report_context.py --run-id <RUN_ID>
+```
+
+This writes the summary bundle and report brief together and prints a JSON payload with the generated file paths plus the collected message count.
+
 ## Writing the Final Report
 
 The summarization step is agent-driven. Once the report Markdown exists, persist it:
@@ -107,6 +115,21 @@ python3 scripts/store_report.py --run-id <RUN_ID> --input-path report.md
 ```
 
 By default the report is written to `data/reports/<RUN_ID>.report.md` and also stored in the `generated_reports` table. Automation can capture either the emitted file path or the stored report record.
+
+To keep report writing consistent, generate a report brief first:
+
+```bash
+python3 scripts/build_report_prompt.py --run-id <RUN_ID> --output data/reports/<RUN_ID>.report_prompt.md
+```
+
+This file is meant to be the first input the agent reads. It gives a generic report contract plus run metadata, candidate URLs, and sender statistics before the agent works through the prepared message bundle.
+
+When writing the final report, prefer these rules:
+
+- do not recap everything; focus on the most important information
+- preserve concrete details only when they materially improve usefulness or accuracy
+- collapse repetition when several messages describe the same situation
+- if the stream contains conflicting or weakly supported claims, keep the main report conservative and note uncertainty clearly
 
 ## Finalization
 
@@ -128,10 +151,40 @@ Useful variants:
 ```bash
 python3 scripts/auth_telegram.py
 python3 scripts/collect_messages.py --target team_alpha --lookback-hours 24 --max-messages 200
-python3 scripts/prepare_summary_input.py --run-id <RUN_ID> --format markdown --output data/reports/<RUN_ID>.summary.md
+python3 scripts/prepare_report_context.py --run-id <RUN_ID>
 # Agent reads the prepared bundle and writes report.md
 python3 scripts/store_report.py --run-id <RUN_ID> --input-path report.md
 python3 scripts/finalize_run.py --run-id <RUN_ID> --mark-read --purge-raw
+```
+
+Example final-report shape:
+
+```markdown
+# Headline summary
+
+Two or three sentences on the most useful outcomes from the chat.
+
+## Why this matters
+
+One short paragraph describing why these signals deserve attention.
+
+## Key topics and signals
+
+- Important developments or noteworthy themes from the message stream
+- Concrete details that help the reader act on the information
+- Distinct items grouped without repeating the same situation multiple times
+
+## Important links
+
+- One or more URLs worth opening later
+
+## Action items or follow-ups
+
+- Practical next steps for the user
+
+## Low-confidence items or uncertainties
+
+- Claims that may be true but were not verified
 ```
 
 ## Retry and Recovery

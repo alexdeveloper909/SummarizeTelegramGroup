@@ -6,19 +6,22 @@
 flowchart TD
     A["auth_telegram.py"] --> B["collect_messages.py"]
     B --> C["SQLite: report_targets / collection_runs / raw_messages"]
-    C --> D["prepare_summary_input.py"]
-    D --> E["Agent summarization step"]
-    E --> F["store_report.py"]
-    F --> G["SQLite: generated_reports"]
-    G --> H["finalize_run.py"]
-    H --> I["Telegram mark read + raw row purge"]
+    C --> D["prepare_report_context.py"]
+    D --> E["summary bundle + report brief"]
+    E --> F["Agent summarization step"]
+    F --> G["store_report.py"]
+    G --> H["SQLite: generated_reports"]
+    H --> I["finalize_run.py"]
+    I --> J["Telegram mark read + raw row purge"]
 ```
 
 ## Component Boundaries
 
 - `scripts/auth_telegram.py`: one-time interactive Telethon login bootstrap.
 - `scripts/collect_messages.py`: resolves one target, fetches unread-first with a lookback fallback, stages normalized rows, and records run status.
+- `scripts/prepare_report_context.py`: preferred orchestration step that writes both the summary bundle and report-writing brief.
 - `scripts/prepare_summary_input.py`: builds an agent-friendly Markdown or JSON bundle from SQLite only.
+- `scripts/build_report_prompt.py`: converts the prepared bundle into a generic report-writing brief for the agent.
 - `scripts/store_report.py`: persists the agent-produced report to disk and to `generated_reports`.
 - `scripts/finalize_run.py`: verifies a report exists, marks the target as read if requested, and purges raw rows by `run_id`.
 - `scripts/purge_old_runs.py`: maintenance cleanup for old finalized runs.

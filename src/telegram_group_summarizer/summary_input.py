@@ -6,8 +6,14 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from .collection import URL_PATTERN
-from .models import SenderStat, SummaryBundle
 from .db import get_run_with_target, list_raw_messages
+from .models import SenderStat, SummaryBundle
+
+
+def _derived_output_path(output_path: Path, extension: str) -> Path:
+    if output_path.suffix:
+        return output_path.with_name(f"{output_path.name}{extension}")
+    return output_path.with_suffix(extension)
 
 
 def build_summary_bundle(connection, run_id: str) -> SummaryBundle:
@@ -49,7 +55,10 @@ def build_summary_bundle(connection, run_id: str) -> SummaryBundle:
                 seen_urls.add(match)
                 candidate_urls.append(match)
 
-    sender_stats = [SenderStat(sender_name=name, message_count=count) for name, count in sender_counter.most_common()]
+    sender_stats = [
+        SenderStat(sender_name=name, message_count=count)
+        for name, count in sender_counter.most_common()
+    ]
     return SummaryBundle(
         run={
             "run_id": run["run_id"],
@@ -115,7 +124,7 @@ def bundle_to_markdown(bundle: SummaryBundle) -> str:
     else:
         lines.append("- No messages collected")
 
-    lines.extend(["", "## Chronological Messages"])
+    lines.extend(["", "## Full Chronological Messages"])
     if bundle.messages:
         for message in bundle.messages:
             sender_name = message["sender_name"] or "Unknown"
@@ -146,7 +155,7 @@ def write_summary_bundle(
         if output_format == "both":
             if output_path is None:
                 raise ValueError("An output path prefix is required when writing both formats.")
-            json_path = output_path.with_suffix(".json")
+            json_path = _derived_output_path(output_path, ".json")
         if json_path is not None:
             json_path.parent.mkdir(parents=True, exist_ok=True)
             json_path.write_text(bundle_to_json(bundle), encoding="utf-8")
@@ -155,7 +164,7 @@ def write_summary_bundle(
     if output_format in {"markdown", "both"}:
         markdown_path = output_path
         if output_format == "both":
-            markdown_path = output_path.with_suffix(".md")
+            markdown_path = _derived_output_path(output_path, ".md")
         if markdown_path is not None:
             markdown_path.parent.mkdir(parents=True, exist_ok=True)
             markdown_path.write_text(bundle_to_markdown(bundle), encoding="utf-8")
