@@ -35,7 +35,9 @@ def ensure_database(config: Optional[AppConfig] = None) -> sqlite3.Connection:
 
 
 def apply_migrations(connection: sqlite3.Connection) -> None:
-    migration_sql = files("telegram_group_summarizer").joinpath("migrations/0001_initial.sql").read_text()
+    migration_sql = (
+        files("telegram_group_summarizer").joinpath("migrations/0001_initial.sql").read_text()
+    )
     connection.executescript(migration_sql)
     connection.execute(
         "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(?, ?)",
@@ -141,9 +143,15 @@ def update_run_status(
         "resolved_entity_type": run["resolved_entity_type"],
         "resolved_entity_display_name": run["resolved_entity_display_name"],
         "completed_at": utc_now() if completed else run["completed_at"],
-        "report_output_path": report_output_path if report_output_path is not None else run["report_output_path"],
-        "read_marked_at": utc_now() if read_marked and run["read_marked_at"] is None else run["read_marked_at"],
-        "raw_purged_at": utc_now() if raw_purged and run["raw_purged_at"] is None else run["raw_purged_at"],
+        "report_output_path": report_output_path
+        if report_output_path is not None
+        else run["report_output_path"],
+        "read_marked_at": utc_now()
+        if read_marked and run["read_marked_at"] is None
+        else run["read_marked_at"],
+        "raw_purged_at": utc_now()
+        if raw_purged and run["raw_purged_at"] is None
+        else run["raw_purged_at"],
         "run_id": run_id,
     }
     if resolved_target is not None:
@@ -172,7 +180,9 @@ def update_run_status(
     connection.commit()
 
 
-def insert_raw_messages(connection: sqlite3.Connection, messages: Iterable[NormalizedMessage]) -> int:
+def insert_raw_messages(
+    connection: sqlite3.Connection, messages: Iterable[NormalizedMessage]
+) -> int:
     rows = list(messages)
     if not rows:
         return 0

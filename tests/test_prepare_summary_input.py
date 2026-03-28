@@ -74,7 +74,9 @@ class SummaryInputTests(unittest.IsolatedAsyncioTestCase):
         self.connection.close()
         self.temp_dir.cleanup()
 
-    async def test_bundle_generation_includes_sender_stats_urls_and_chronological_messages(self) -> None:
+    async def test_bundle_generation_includes_sender_stats_urls_and_chronological_messages(
+        self,
+    ) -> None:
         now = datetime.now(timezone.utc)
         resolved_target = ResolvedTarget(
             target_key="team_alpha",
@@ -84,8 +86,20 @@ class SummaryInputTests(unittest.IsolatedAsyncioTestCase):
             reference=TargetReference(kind="username", value="team_alpha"),
         )
         messages = [
-            FakeMessage(id=1, date=now, sender_id=1, sender=FakeSender("Alice", "Smith"), text="One https://a.test"),
-            FakeMessage(id=2, date=now, sender_id=2, sender=FakeSender("Bob", "Jones"), text="Two https://b.test"),
+            FakeMessage(
+                id=1,
+                date=now,
+                sender_id=1,
+                sender=FakeSender("Alice", "Smith"),
+                text="One https://a.test",
+            ),
+            FakeMessage(
+                id=2,
+                date=now,
+                sender_id=2,
+                sender=FakeSender("Bob", "Jones"),
+                text="Two https://b.test",
+            ),
         ]
         client = FakeTelegramClient(resolved_target, lookback_messages=messages)
         await collect_messages_for_run(

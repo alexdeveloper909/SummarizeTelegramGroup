@@ -34,16 +34,14 @@ def _load_local_env(repo_root: Path) -> Dict[str, str]:
                 line = line[7:].strip()
             if "=" not in line:
                 raise ValueError(
-                    f"Invalid line in {candidate}:{line_number}. "
-                    "Expected KEY=VALUE format."
+                    f"Invalid line in {candidate}:{line_number}. Expected KEY=VALUE format."
                 )
             key, value = line.split("=", 1)
             key = key.strip()
             value = value.strip()
             if not key:
                 raise ValueError(
-                    f"Invalid line in {candidate}:{line_number}. "
-                    "Missing environment variable name."
+                    f"Invalid line in {candidate}:{line_number}. Missing environment variable name."
                 )
             if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
                 value = value[1:-1]

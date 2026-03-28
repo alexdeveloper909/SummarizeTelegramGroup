@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 from .collection import normalize_datetime
 from .config import AppConfig
@@ -41,9 +41,7 @@ class TelethonWorkflowClient:
         lookup_value = self._lookup_value(reference.value, reference.kind)
         entity = await self.client.get_entity(lookup_value)
         display_name = (
-            getattr(entity, "title", None)
-            or getattr(entity, "first_name", None)
-            or reference.value
+            getattr(entity, "title", None) or getattr(entity, "first_name", None) or reference.value
         )
         entity_type = entity.__class__.__name__.lower()
         entity_id = getattr(entity, "id", None)
@@ -80,3 +78,20 @@ class TelethonWorkflowClient:
     async def mark_target_read(self, target: ResolvedTarget) -> None:
         input_entity = await self._input_entity(target)
         await self.client.send_read_acknowledge(input_entity)
+
+    async def send_text_message(
+        self,
+        target: ResolvedTarget,
+        text: str,
+        *,
+        formatting_entities: Optional[Iterable[object]] = None,
+        link_preview: bool = False,
+    ):
+        input_entity = await self._input_entity(target)
+        kwargs = {
+            "message": text,
+            "link_preview": link_preview,
+        }
+        if formatting_entities is not None:
+            kwargs["formatting_entities"] = list(formatting_entities)
+        return await self.client.send_message(input_entity, **kwargs)

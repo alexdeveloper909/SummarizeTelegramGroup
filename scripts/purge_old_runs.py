@@ -10,7 +10,12 @@ from telegram_group_summarizer.logging_utils import configure_logging
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Purge old finalized raw-message staging rows.")
-    parser.add_argument("--older-than-hours", type=int, default=168, help="Delete finalized runs older than this age.")
+    parser.add_argument(
+        "--older-than-hours",
+        type=int,
+        default=168,
+        help="Delete finalized runs older than this age.",
+    )
     args = parser.parse_args()
 
     config = load_config()

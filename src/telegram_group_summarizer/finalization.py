@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from .db import count_raw_messages, delete_raw_messages, get_generated_report, get_run_with_target, update_run_status
+from .db import (
+    count_raw_messages,
+    delete_raw_messages,
+    get_generated_report,
+    get_run_with_target,
+    update_run_status,
+)
 from .models import ResolvedTarget, TargetReference
 
 
@@ -48,5 +54,7 @@ async def finalize_run(
             "report_output_path": report["output_path"],
         }
     except Exception as exc:
-        update_run_status(connection, run_id, status="failed_finalization", error_summary=str(exc), completed=True)
+        update_run_status(
+            connection, run_id, status="failed_finalization", error_summary=str(exc), completed=True
+        )
         raise

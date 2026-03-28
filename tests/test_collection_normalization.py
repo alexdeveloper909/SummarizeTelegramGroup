@@ -12,7 +12,12 @@ from telegram_group_summarizer.collection import (
     normalize_message,
 )
 from telegram_group_summarizer.config import AppConfig
-from telegram_group_summarizer.db import ensure_database, get_run, get_target_by_key, list_raw_messages
+from telegram_group_summarizer.db import (
+    ensure_database,
+    get_run,
+    get_target_by_key,
+    list_raw_messages,
+)
 from telegram_group_summarizer.models import ResolvedTarget, TargetReference
 
 
@@ -47,7 +52,9 @@ class FakeMessage:
 
 
 class FakeTelegramClient:
-    def __init__(self, resolved_target: ResolvedTarget, unread_messages=None, lookback_messages=None):
+    def __init__(
+        self, resolved_target: ResolvedTarget, unread_messages=None, lookback_messages=None
+    ):
         self.resolved_target = resolved_target
         self.unread_messages = unread_messages if unread_messages is not None else []
         self.lookback_messages = lookback_messages if lookback_messages is not None else []
@@ -131,7 +138,9 @@ class CollectionTests(unittest.IsolatedAsyncioTestCase):
             sender=FakeSender(first_name="Alice", last_name="Smith"),
             text="Unread update with https://example.com",
         )
-        client = FakeTelegramClient(resolved_target, unread_messages=[unread_message], lookback_messages=[])
+        client = FakeTelegramClient(
+            resolved_target, unread_messages=[unread_message], lookback_messages=[]
+        )
 
         result = await collect_messages_for_run(
             connection=self.connection,
@@ -168,9 +177,15 @@ class CollectionTests(unittest.IsolatedAsyncioTestCase):
         username_reference = derive_target_reference(self.connection, "@teamusername")
         numeric_reference = derive_target_reference(self.connection, "-10012345")
 
-        self.assertEqual(("target_key", "team_alias"), (alias_reference.kind, alias_reference.value))
-        self.assertEqual(("username", "teamusername"), (username_reference.kind, username_reference.value))
-        self.assertEqual(("entity_id", "-10012345"), (numeric_reference.kind, numeric_reference.value))
+        self.assertEqual(
+            ("target_key", "team_alias"), (alias_reference.kind, alias_reference.value)
+        )
+        self.assertEqual(
+            ("username", "teamusername"), (username_reference.kind, username_reference.value)
+        )
+        self.assertEqual(
+            ("entity_id", "-10012345"), (numeric_reference.kind, numeric_reference.value)
+        )
         self.assertIsNotNone(get_target_by_key(self.connection, "team_alias"))
 
 

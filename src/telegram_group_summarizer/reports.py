@@ -44,5 +44,7 @@ def store_report(
         report_markdown=report_markdown,
         output_path=str(final_output_path),
     )
-    update_run_status(connection, run_id, status="summarized", report_output_path=str(final_output_path))
+    update_run_status(
+        connection, run_id, status="summarized", report_output_path=str(final_output_path)
+    )
     return final_output_path

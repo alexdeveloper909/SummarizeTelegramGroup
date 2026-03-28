@@ -14,7 +14,9 @@ from telegram_group_summarizer.telethon_client import TelethonWorkflowClient, cr
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Collect Telegram messages into SQLite.")
-    parser.add_argument("--target", required=True, help="Target key, username, or Telegram entity ID.")
+    parser.add_argument(
+        "--target", required=True, help="Target key, username, or Telegram entity ID."
+    )
     parser.add_argument("--lookback-hours", type=int, help="Lookback window in hours.")
     parser.add_argument("--max-messages", type=int, help="Maximum number of messages to collect.")
     parser.add_argument("--run-id", help="Optional run identifier supplied by the orchestrator.")

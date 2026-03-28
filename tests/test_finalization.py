@@ -87,7 +87,15 @@ class FinalizationTests(unittest.IsolatedAsyncioTestCase):
             self.resolved_target,
             messages=messages
             if messages is not None
-            else [FakeMessage(id=1, date=self.now, sender_id=1, sender=FakeSender("Alice", "Smith"), text="hello")],
+            else [
+                FakeMessage(
+                    id=1,
+                    date=self.now,
+                    sender_id=1,
+                    sender=FakeSender("Alice", "Smith"),
+                    text="hello",
+                )
+            ],
         )
         await collect_messages_for_run(
             connection=self.connection,

@@ -55,7 +55,9 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual("wal", str(journal_mode).lower())
 
     def test_report_target_key_is_unique(self) -> None:
-        target = placeholder_target("team_alpha", TargetReference(kind="target_key", value="team_alpha"))
+        target = placeholder_target(
+            "team_alpha", TargetReference(kind="target_key", value="team_alpha")
+        )
         upsert_report_target(self.connection, target)
         with self.assertRaises(sqlite3.IntegrityError):
             self.connection.execute(

@@ -1,7 +1,7 @@
 # Telegram Group Summarizer Specification
 
 Status: Draft  
-Last updated: 2026-03-27
+Last updated: 2026-03-28
 
 ## 1. Purpose
 
@@ -12,6 +12,7 @@ Build a local, automation-friendly project that can:
 3. Produce a clear human-readable report.
 4. Mark the processed Telegram messages as read after the run completes successfully.
 5. Clean up staged raw message data after the report is produced.
+6. Optionally post an already-written report Markdown file into a specified Telegram chat when an operator explicitly asks for delivery.
 
 The expected operator is an AI agent running on a schedule, not a human manually running commands every morning.
 
@@ -31,7 +32,7 @@ The user is a member of multiple Telegram groups and does not have time to read 
 ## 4. Non-Goals
 
 - Building a web UI in the first version.
-- Supporting message sending, replying, or moderation actions.
+- Automated message sending, replying, or moderation actions.
 - Long-term archival of all Telegram history.
 - Multi-user access control inside this repository.
 - Real-time streaming or always-on background consumption.
@@ -43,6 +44,7 @@ The user is a member of multiple Telegram groups and does not have time to read 
 - The summarization model is provided by the agent environment and is not hard-coded into the collector script.
 - A failed run must not delete raw data that may be needed for retry or debugging.
 - Raw staged message data can be deleted after a successful report is produced and captured.
+- Manual report delivery is a separate operator-invoked action and is not part of the default scheduled summarization pipeline.
 
 ## 6. External Constraints Verified Upfront
 
@@ -63,6 +65,7 @@ Daily automation run:
 6. The agent performs summarization, optionally using web search for deeper investigation when needed.
 7. The agent outputs a report in Markdown or another agreed format.
 8. On successful completion, the pipeline marks the target as read in Telegram and purges staged raw rows for that run.
+9. If a human or agent explicitly requests delivery, a separate script can post the already-written report Markdown into a specified Telegram chat without changing run-finalization behavior.
 
 ## 8. Functional Requirements
 
@@ -108,7 +111,16 @@ Daily automation run:
 - After successful report generation and delivery, staged raw message rows for that run must be deleted.
 - If the run fails before the report is finalized, raw rows must remain available for retry and debugging.
 
-### 8.5 Documentation
+### 8.5 On-Demand Report Delivery
+
+- The system may provide a separate script that reads an existing Markdown report from disk and sends it to a specified Telegram chat.
+- This script must be explicitly invoked by an operator or agent and must not run automatically as part of collection, preparation, report storage, or finalization.
+- Delivery must reuse the local Telethon session model already used by the rest of the project.
+- Delivery must convert Markdown into Telegram-ready formatting through `telegramify-markdown`.
+- Delivery must split oversized outbound content into multiple Telegram messages so each message stays within Telegram's documented text-length limits.
+- Delivery must not mark source chats as read, purge staged raw rows, or otherwise alter summarization-run state.
+
+### 8.6 Documentation
 
 - The repository must contain a human-oriented setup guide.
 - The repository must contain a root `AGENTS.md` file that explains the project, available scripts, operating conventions, and safety rules for coding agents.
@@ -139,6 +151,7 @@ Daily automation run:
 - Local scripts must be runnable by an agent without interactive editing of source code.
 - The system should use explicit CLI arguments or environment variables, not hidden constants.
 - Each run should emit enough structured logs to diagnose which target, run ID, and phase failed.
+- The manual report-delivery path may depend on Python 3.10 or newer because `telegramify-markdown`'s entity-based API requires it.
 
 ## 10. Architectural Proposal
 
@@ -149,13 +162,15 @@ Daily automation run:
 3. `prepare_summary_input`: Python script that reads a run from SQLite and emits an agent-friendly Markdown or JSON package.
 4. `summarizer`: agent-driven step that reads prepared input, extracts signals, optionally browses the web, and writes a report.
 5. `finalize_run`: Python script that marks the Telegram target as read and purges staged raw rows for the successful run.
-6. `docs`: human and agent documentation.
+6. `report_delivery`: Python script and helper code that optionally send an already-written Markdown report into a specified Telegram chat.
+7. `docs`: human and agent documentation.
 
 ### 10.2 Separation of Concerns
 
-- Telegram access belongs only in collection and finalization scripts.
+- Telegram access belongs only in collection, finalization, and the explicitly invoked report-delivery script.
 - The summarization stage should work entirely from the SQLite-backed prepared dataset.
 - Cleanup should happen only after successful report creation.
+- Report delivery should remain isolated from collection and finalization state transitions so it can be invoked on demand without changing pipeline behavior.
 
 This separation keeps Telegram access narrow, makes summarization reproducible, and reduces accidental data loss.
 
@@ -183,6 +198,7 @@ This separation keeps Telegram access narrow, makes summarization reproducible, 
 │   ├── prepare_report_context.py
 │   ├── prepare_summary_input.py
 │   ├── build_report_prompt.py
+│   ├── send_markdown_report.py
 │   ├── finalize_run.py
 │   └── purge_old_runs.py
 ├── src/
@@ -194,6 +210,7 @@ This separation keeps Telegram access narrow, makes summarization reproducible, 
 │       ├── collection.py
 │       ├── report_context.py
 │       ├── report_prompt.py
+│       ├── report_delivery.py
 │       ├── summary_input.py
 │       ├── finalization.py
 │       └── logging_utils.py

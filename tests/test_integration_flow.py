@@ -33,7 +33,9 @@ class FakeMessage:
 
 
 class FakeTelegramClient:
-    def __init__(self, resolved_target: ResolvedTarget, unread_messages=None, lookback_messages=None):
+    def __init__(
+        self, resolved_target: ResolvedTarget, unread_messages=None, lookback_messages=None
+    ):
         self.resolved_target = resolved_target
         self.unread_messages = unread_messages if unread_messages is not None else []
         self.lookback_messages = lookback_messages if lookback_messages is not None else []
@@ -104,7 +106,9 @@ class IntegrationFlowTests(unittest.IsolatedAsyncioTestCase):
                 unread=False,
             ),
         ]
-        client = FakeTelegramClient(resolved_target, unread_messages=[], lookback_messages=lookback_messages)
+        client = FakeTelegramClient(
+            resolved_target, unread_messages=[], lookback_messages=lookback_messages
+        )
 
         collect_result = await collect_messages_for_run(
             connection=self.connection,

@@ -124,7 +124,11 @@ def raw_message_payload(message: Any) -> str:
 def normalize_message(*, run_id: str, target_id: int, message: Any) -> NormalizedMessage:
     text = extract_text(message)
     sender = getattr(message, "sender", None)
-    sender_name = getattr(message, "sender_name", None) or getattr(message, "post_author", None) or sender_display_name(sender)
+    sender_name = (
+        getattr(message, "sender_name", None)
+        or getattr(message, "post_author", None)
+        or sender_display_name(sender)
+    )
     media_kind = detect_media_kind(message)
     timestamp = normalize_datetime(getattr(message, "date", None))
     edited_at = getattr(message, "edit_date", None)
@@ -214,7 +218,9 @@ async def collect_messages_for_run(
         resolved_target = await telegram_client.resolve_target(reference)
         target_id = upsert_report_target(connection, resolved_target)
 
-        unread_messages = await telegram_client.fetch_unread_messages(resolved_target, limit=max_messages)
+        unread_messages = await telegram_client.fetch_unread_messages(
+            resolved_target, limit=max_messages
+        )
         collected_messages: List[Any] = []
         mode = "lookback"
 

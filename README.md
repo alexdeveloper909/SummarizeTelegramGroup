@@ -1,6 +1,6 @@
 # SummarizeTelegramGroup
 
-Local automation-friendly Telegram group summarizer with a Telethon collection step, SQLite staging, agent-oriented summary input generation, report storage, and retry-safe finalization.
+Local automation-friendly Telegram group summarizer with a Telethon collection step, SQLite staging, agent-oriented summary input generation, report storage, retry-safe finalization, and an explicit on-demand Markdown report delivery script.
 
 Start with:
 

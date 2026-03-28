@@ -70,10 +70,7 @@ def build_report_prompt(
 
     lines.extend(["", "## Sender Statistics"])
     if bundle.sender_stats:
-        lines.extend(
-            f"- {stat.sender_name}: {stat.message_count}"
-            for stat in bundle.sender_stats
-        )
+        lines.extend(f"- {stat.sender_name}: {stat.message_count}" for stat in bundle.sender_stats)
     else:
         lines.append("- None")
 

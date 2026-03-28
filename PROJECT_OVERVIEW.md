@@ -1,8 +1,8 @@
 # Project Overview
 
-This repository is an automation-friendly workspace for generating daily reports from Telegram groups or channels. The intended runtime is an AI coding agent or agent CLI that can execute local scripts, inspect stored message data, optionally perform web research for deeper context, and produce a concise morning report.
+This repository is an automation-friendly workspace for generating daily reports from Telegram groups or channels. The intended runtime is an AI coding agent or agent CLI that can execute local scripts, inspect stored message data, optionally perform web research for deeper context, produce a concise morning report, and optionally deliver an already-written report back into Telegram when explicitly requested.
 
-The current repository includes a first working version of the local pipeline: Telethon auth/bootstrap, SQLite-backed collection and staging, summary-input preparation, report persistence, retry-safe finalization, and supporting test coverage.
+The current repository includes a first working version of the local pipeline: Telethon auth/bootstrap, SQLite-backed collection and staging, summary-input preparation, report persistence, retry-safe finalization, an opt-in report-delivery script, and supporting test coverage.
 
 The near-term optimization direction is to keep summarization selective without hard-coding domain-specific heuristics into the preparation step.
 The current reporting flow now includes a dedicated report-writing brief so the summarizer can start from a clear generic contract before reading the full message chronology.
@@ -24,6 +24,7 @@ The preferred operator path now uses one orchestration step to generate both the
 - SQLite storage for per-run message staging and report metadata
 - Agent-friendly scripts and prompts for summarization and report writing
 - A report workflow that favors high-signal items over raw chronological replay
+- An explicit Markdown-to-Telegram delivery path for posting finalized reports into a chosen chat
 - Cleanup and read-state handling so each automation run finishes in a consistent state
 - Documentation that supports both human operators and automation agents
 
@@ -37,6 +38,7 @@ The preferred operator path now uses one orchestration step to generate both the
 - Keep Telegram secrets in environment variables or local ignored env files such as `.secrets/telegram.env`
 - Allow auth bootstrap to source the Telegram phone number from local config to reduce interactive setup friction
 - Allow auth bootstrap to source the Telegram 2FA password from local config when two-step verification is enabled
+- Keep report delivery manual and explicitly invoked; do not wire it into the default collection and finalization flow
 
 ## Next Document to Read
 

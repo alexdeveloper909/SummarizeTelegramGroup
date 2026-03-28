@@ -12,7 +12,9 @@ from telegram_group_summarizer.telethon_client import TelethonWorkflowClient, cr
 
 
 async def main() -> None:
-    parser = argparse.ArgumentParser(description="Finalize a successful Telegram summarization run.")
+    parser = argparse.ArgumentParser(
+        description="Finalize a successful Telegram summarization run."
+    )
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--mark-read", action="store_true")
     parser.add_argument("--purge-raw", action="store_true")

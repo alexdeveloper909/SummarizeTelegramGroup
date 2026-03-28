@@ -28,6 +28,7 @@ class FakeTelethonClient:
         self.get_input_entity_calls = []
         self.iter_messages_calls = []
         self.read_ack_calls = []
+        self.send_message_calls = []
 
     async def get_entity(self, value):
         self.get_entity_calls.append(value)
@@ -44,6 +45,10 @@ class FakeTelethonClient:
 
     async def send_read_acknowledge(self, entity) -> None:
         self.read_ack_calls.append(entity)
+
+    async def send_message(self, entity, **kwargs):
+        self.send_message_calls.append((entity, kwargs))
+        return {"id": 99}
 
 
 class TelethonWorkflowClientTests(unittest.IsolatedAsyncioTestCase):
@@ -79,6 +84,39 @@ class TelethonWorkflowClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([("input:-1001843781678", 10)], client.iter_messages_calls)
         self.assertEqual(["input:-1001843781678"], client.read_ack_calls)
         self.assertEqual(1, len(messages))
+
+    async def test_send_text_message_reuses_input_entity_lookup(self) -> None:
+        client = FakeTelethonClient()
+        workflow_client = TelethonWorkflowClient(client)
+        target = ResolvedTarget(
+            target_key="-1001843781678",
+            entity_id=1843781678,
+            entity_type="channel",
+            display_name="Numeric Group",
+            reference=TargetReference(kind="target_key", value="-1001843781678"),
+        )
+
+        await workflow_client.send_text_message(
+            target,
+            "Hello",
+            formatting_entities=("bold",),
+            link_preview=True,
+        )
+
+        self.assertEqual([-1001843781678], client.get_input_entity_calls)
+        self.assertEqual(
+            [
+                (
+                    "input:-1001843781678",
+                    {
+                        "message": "Hello",
+                        "formatting_entities": ["bold"],
+                        "link_preview": True,
+                    },
+                )
+            ],
+            client.send_message_calls,
+        )
 
 
 if __name__ == "__main__":

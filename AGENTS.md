@@ -9,6 +9,7 @@ This repository is building toward an automation-oriented Telegram group summari
 - prepares agent-friendly summary input
 - produces a concise report from the prepared data
 - finalizes the run by marking the Telegram target as read and purging staged raw data
+- optionally delivers an already-written report to a chosen Telegram chat when explicitly requested
 
 The repository now contains a working local pipeline. Read the documentation before writing code.
 
@@ -29,6 +30,8 @@ If implementation-specific docs are later added under `docs/`, prefer the most s
 - Keep raw Telegram data retention minimal.
 - Do not mark Telegram messages as read until a report has been successfully produced.
 - Do not purge staged raw data on failed runs.
+- Keep report delivery separate from the default summarization flow; do not add automatic outbound sending unless the user explicitly requests that scope change.
+- Do not hard-code delivery targets; prefer explicit CLI arguments and environment variables.
 
 ## Security Notes
 
@@ -49,7 +52,7 @@ If implementation-specific docs are later added under `docs/`, prefer the most s
 
 ## Expected Repository Areas
 
-- `scripts/`: runnable entrypoints for auth, collection, preparation, finalization, and maintenance
+- `scripts/`: runnable entrypoints for auth, collection, preparation, finalization, manual report delivery, and maintenance
 - `src/`: reusable Python package code
 - `docs/`: implementation and operations documents
 - `data/`: local runtime data such as SQLite databases, report outputs, and session files
@@ -59,33 +62,34 @@ If implementation-specific docs are later added under `docs/`, prefer the most s
 
 Environment setup:
 
-- `python3 -m venv .venv && source .venv/bin/activate`
+- `python3.12 -m venv .venv && source .venv/bin/activate`
 - `pip install -e '.[telegram,dev]'`
 
 Test commands:
 
-- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
+- `PYTHONPATH=src python3.12 -m unittest discover -s tests -v`
 
 Lint and format commands:
 
-- `python3 -m ruff check src scripts tests`
-- `python3 -m ruff format src scripts tests`
+- `python3.12 -m ruff check src scripts tests`
+- `python3.12 -m ruff format src scripts tests`
 
 Standard local run flow:
 
-- `python3 scripts/auth_telegram.py`
-- `python3 scripts/collect_messages.py --target <target> --lookback-hours 24 --max-messages 500`
-- `python3 scripts/prepare_report_context.py --run-id <run_id>`
-- Agent writes the final report and stores it with `python3 scripts/store_report.py --run-id <run_id> --input-path <report.md>`
-- `python3 scripts/finalize_run.py --run-id <run_id> --mark-read --purge-raw`
+- `python3.12 scripts/auth_telegram.py`
+- `python3.12 scripts/collect_messages.py --target <target> --lookback-hours 24 --max-messages 500`
+- `python3.12 scripts/prepare_report_context.py --run-id <run_id>`
+- Agent writes the final report and stores it with `python3.12 scripts/store_report.py --run-id <run_id> --input-path <report.md>`
+- `python3.12 scripts/finalize_run.py --run-id <run_id> --mark-read --purge-raw`
+- `python3.12 scripts/send_markdown_report.py --input-path <report.md> --target <target>`
 
 The lower-level scripts `prepare_summary_input.py` and `build_report_prompt.py` remain available for debugging or partial reruns.
 
 Minimum pre-merge validation:
 
-- Run `PYTHONPATH=src python3 -m unittest discover -s tests -v`
-- Run `python3 -m compileall src scripts tests`
-- Run `python3 -m ruff check src scripts tests`
+- Run `PYTHONPATH=src python3.12 -m unittest discover -s tests -v`
+- Run `python3.12 -m compileall src scripts tests`
+- Run `python3.12 -m ruff check src scripts tests`
 
 ## Agent Guidance
 
@@ -96,3 +100,4 @@ Minimum pre-merge validation:
 - Alias mapping currently lives in `report_targets.target_key`. Existing rows take precedence over username parsing during target resolution.
 - When preparing or reviewing report output, rely on the prepared bundle and let the model determine what matters.
 - When writing a final report, use the generated report prompt/brief before falling back to the full bundle.
+- When delivering a report to Telegram, use the dedicated delivery script and keep it opt-in; never wire it into the standard collection/store/finalize pipeline without explicit user approval.

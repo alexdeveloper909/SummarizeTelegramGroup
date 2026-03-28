@@ -1,19 +1,19 @@
 # User Guide
 
-This project collects Telegram messages for a single target, stages normalized rows in local SQLite, prepares an agent-friendly summary bundle, stores a final report, and only then marks the Telegram target as read and purges staged raw rows.
+This project collects Telegram messages for a single target, stages normalized rows in local SQLite, prepares an agent-friendly summary bundle, stores a final report, and only then marks the Telegram target as read and purges staged raw rows. It also supports an explicit manual step for sending an existing Markdown report into a Telegram chat.
 
 Use [docs/specification.md](docs/specification.md) for the detailed contract. Use this guide for setup and normal operations.
 
 ## Prerequisites
 
-- Python 3.9 or newer
+- Python 3.10 or newer
 - A Telegram API ID and API hash from https://my.telegram.org
 - A local virtual environment
 
 Recommended setup:
 
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[telegram,dev]'
 ```
@@ -53,12 +53,14 @@ Optional environment variables:
 - `TELEGRAM_SUMMARIZER_SQLITE_BUSY_TIMEOUT_MS`: default `5000`
 - `TELEGRAM_SUMMARIZER_LOG_LEVEL`: default `INFO`
 
+The manual report-delivery script also depends on `telegramify-markdown`, which uses a Python 3.10+ entity-based API.
+
 ## Telegram Authentication Bootstrap
 
 Run the one-time interactive authentication flow:
 
 ```bash
-python3 scripts/auth_telegram.py
+python3.12 scripts/auth_telegram.py
 ```
 
 If `TELEGRAM_PHONE` is configured, the script skips the phone-number prompt. If `TELEGRAM_PASSWORD` is also configured, the script also skips the Telegram 2FA password prompt and only asks for the one-time login code.
@@ -70,7 +72,7 @@ This creates a local Telethon session under `data/sessions/`. Session files are 
 Collect unread messages first, with a lookback fallback:
 
 ```bash
-python3 scripts/collect_messages.py --target team_alpha --lookback-hours 24 --max-messages 500
+python3.12 scripts/collect_messages.py --target team_alpha --lookback-hours 24 --max-messages 500
 ```
 
 `--target` accepts:
@@ -88,7 +90,7 @@ The collector prints a JSON payload including the `run_id`.
 Build agent-friendly summary input without calling Telegram again:
 
 ```bash
-python3 scripts/prepare_summary_input.py --run-id <RUN_ID> --format both --output data/reports/<RUN_ID>.summary
+python3.12 scripts/prepare_summary_input.py --run-id <RUN_ID> --format both --output data/reports/<RUN_ID>.summary
 ```
 
 This writes:
@@ -101,7 +103,7 @@ If you omit `--output`, the script prints the requested format to stdout.
 Preferred combined step:
 
 ```bash
-python3 scripts/prepare_report_context.py --run-id <RUN_ID>
+python3.12 scripts/prepare_report_context.py --run-id <RUN_ID>
 ```
 
 This writes the summary bundle and report brief together and prints a JSON payload with the generated file paths plus the collected message count.
@@ -111,7 +113,7 @@ This writes the summary bundle and report brief together and prints a JSON paylo
 The summarization step is agent-driven. Once the report Markdown exists, persist it:
 
 ```bash
-python3 scripts/store_report.py --run-id <RUN_ID> --input-path report.md
+python3.12 scripts/store_report.py --run-id <RUN_ID> --input-path report.md
 ```
 
 By default the report is written to `data/reports/<RUN_ID>.report.md` and also stored in the `generated_reports` table. Automation can capture either the emitted file path or the stored report record.
@@ -119,7 +121,7 @@ By default the report is written to `data/reports/<RUN_ID>.report.md` and also s
 To keep report writing consistent, generate a report brief first:
 
 ```bash
-python3 scripts/build_report_prompt.py --run-id <RUN_ID> --output data/reports/<RUN_ID>.report_prompt.md
+python3.12 scripts/build_report_prompt.py --run-id <RUN_ID> --output data/reports/<RUN_ID>.report_prompt.md
 ```
 
 This file is meant to be the first input the agent reads. It gives a generic report contract plus run metadata, candidate URLs, and sender statistics before the agent works through the prepared message bundle.
@@ -131,30 +133,51 @@ When writing the final report, prefer these rules:
 - collapse repetition when several messages describe the same situation
 - if the stream contains conflicting or weakly supported claims, keep the main report conservative and note uncertainty clearly
 
+## Sending a Stored Report to Telegram
+
+This is a separate manual step. It is not part of the default collection, preparation, storage, or finalization flow.
+
+Use it only when you explicitly want to deliver an already-written Markdown file to a Telegram chat:
+
+```bash
+python3.12 scripts/send_markdown_report.py \
+  --input-path telegram_groups_consolidated_summary_2026-03-28.md \
+  --target -1003572938359
+```
+
+Behavior:
+
+- reads an existing Markdown file from disk
+- converts it with `telegramify-markdown`
+- splits oversized content into multiple Telegram-safe messages
+- sends the chunks sequentially through the existing Telethon session
+
+The script does not alter collection-run state. It does not mark chats as read, purge raw rows, or auto-run after report generation.
+
 ## Finalization
 
 Only finalize after the report has been stored successfully:
 
 ```bash
-python3 scripts/finalize_run.py --run-id <RUN_ID> --mark-read --purge-raw
+python3.12 scripts/finalize_run.py --run-id <RUN_ID> --mark-read --purge-raw
 ```
 
 Useful variants:
 
-- `python3 scripts/finalize_run.py --run-id <RUN_ID> --purge-raw`
-- `python3 scripts/finalize_run.py --run-id <RUN_ID> --mark-read`
+- `python3.12 scripts/finalize_run.py --run-id <RUN_ID> --purge-raw`
+- `python3.12 scripts/finalize_run.py --run-id <RUN_ID> --mark-read`
 
 `finalize_run.py` refuses to finalize a run that has no stored report.
 
 ## End-to-End Dry Run Example
 
 ```bash
-python3 scripts/auth_telegram.py
-python3 scripts/collect_messages.py --target team_alpha --lookback-hours 24 --max-messages 200
-python3 scripts/prepare_report_context.py --run-id <RUN_ID>
+python3.12 scripts/auth_telegram.py
+python3.12 scripts/collect_messages.py --target team_alpha --lookback-hours 24 --max-messages 200
+python3.12 scripts/prepare_report_context.py --run-id <RUN_ID>
 # Agent reads the prepared bundle and writes report.md
-python3 scripts/store_report.py --run-id <RUN_ID> --input-path report.md
-python3 scripts/finalize_run.py --run-id <RUN_ID> --mark-read --purge-raw
+python3.12 scripts/store_report.py --run-id <RUN_ID> --input-path report.md
+python3.12 scripts/finalize_run.py --run-id <RUN_ID> --mark-read --purge-raw
 ```
 
 Example final-report shape:
@@ -199,12 +222,13 @@ One short paragraph describing why these signals deserve attention.
 
 - Missing credentials: set `TELEGRAM_API_ID` and `TELEGRAM_API_HASH`.
 - Telethon import errors: install project extras with `pip install -e '.[telegram]'`.
+- Report-delivery import errors: ensure you created the environment with Python 3.10+ and installed `.[telegram]`.
 - Empty prepared bundle: the target may genuinely have no unread or recent messages inside the lookback window.
 - Username or entity resolution failures: authenticate first and confirm the target is reachable from the logged-in Telegram account.
 - SQLite lock delays: keep the default WAL mode and busy timeout unless you have a reason to tune them.
 
 ## Validation Commands
 
-- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
-- `python3 -m compileall src scripts tests`
-- `python3 -m ruff check src scripts tests`
+- `PYTHONPATH=src python3.12 -m unittest discover -s tests -v`
+- `python3.12 -m compileall src scripts tests`
+- `python3.12 -m ruff check src scripts tests`
