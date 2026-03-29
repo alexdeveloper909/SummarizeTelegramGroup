@@ -184,7 +184,7 @@ class TelethonWorkflowClientTests(unittest.IsolatedAsyncioTestCase):
             replies = await workflow_client.fetch_forum_topic_messages(target, topic, limit=5)
             await workflow_client.mark_forum_topic_read(
                 target,
-                topic_top_message_id=100,
+                topic_id=10,
                 highest_message_id=102,
             )
 
@@ -196,6 +196,7 @@ class TelethonWorkflowClientTests(unittest.IsolatedAsyncioTestCase):
             [request.name for request in client.request_calls],
         )
         self.assertEqual(102, client.request_calls[-1].kwargs["read_max_id"])
+        self.assertEqual(10, client.request_calls[-1].kwargs["msg_id"])
 
     async def test_send_text_message_reuses_input_entity_lookup(self) -> None:
         client = FakeTelethonClient()

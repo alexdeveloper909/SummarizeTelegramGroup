@@ -107,7 +107,7 @@ class TelethonWorkflowClient:
             page_limit = min(100, remaining) if remaining is not None else 100
             response = await self.client(
                 functions.messages.GetForumTopicsRequest(
-                    channel=input_entity,
+                    peer=input_entity,
                     offset_date=offset_date,
                     offset_id=offset_id,
                     offset_topic=offset_topic,
@@ -143,7 +143,7 @@ class TelethonWorkflowClient:
         response = await self.client(
             functions.messages.GetRepliesRequest(
                 peer=input_entity,
-                msg_id=topic.forum_topic_top_message_id,
+                msg_id=topic.forum_topic_id,
                 offset_id=0,
                 offset_date=None,
                 add_offset=0,
@@ -165,7 +165,7 @@ class TelethonWorkflowClient:
         self,
         target: ResolvedTarget,
         *,
-        topic_top_message_id: int,
+        topic_id: int,
         highest_message_id: int,
     ) -> None:
         functions = _load_telethon_functions()
@@ -173,7 +173,7 @@ class TelethonWorkflowClient:
         await self.client(
             functions.messages.ReadDiscussionRequest(
                 peer=input_entity,
-                msg_id=topic_top_message_id,
+                msg_id=topic_id,
                 read_max_id=highest_message_id,
             )
         )

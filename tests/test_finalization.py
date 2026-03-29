@@ -90,10 +90,10 @@ class FakeTelegramClient:
         self,
         target: ResolvedTarget,
         *,
-        topic_top_message_id: int,
+        topic_id: int,
         highest_message_id: int,
     ) -> None:
-        self.marked_forum_topics.append((topic_top_message_id, highest_message_id))
+        self.marked_forum_topics.append((topic_id, highest_message_id))
 
 
 class FinalizationTests(unittest.IsolatedAsyncioTestCase):
@@ -272,7 +272,7 @@ class FinalizationTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual([], fake_client.marked_read)
-        self.assertEqual([(100, 102), (200, 201)], fake_client.marked_forum_topics)
+        self.assertEqual([(10, 102), (20, 201)], fake_client.marked_forum_topics)
         self.assertEqual("forum", result["target_mode"])
         self.assertEqual(0, count_raw_messages(self.connection, "run-forum-finalize"))
 

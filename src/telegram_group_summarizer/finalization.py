@@ -19,7 +19,7 @@ async def _mark_run_read(connection, telegram_client, run, resolved_target: Reso
         for topic_read_point in list_forum_topic_read_points(connection, run["run_id"]):
             await telegram_client.mark_forum_topic_read(
                 resolved_target,
-                topic_top_message_id=int(topic_read_point["forum_topic_top_message_id"]),
+                topic_id=int(topic_read_point["forum_topic_id"]),
                 highest_message_id=int(topic_read_point["highest_message_id"]),
             )
         return
