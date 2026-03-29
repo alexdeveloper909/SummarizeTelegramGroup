@@ -17,7 +17,6 @@ from .db import (
 )
 from .models import NormalizedMessage, ResolvedTarget, TargetReference
 
-
 URL_PATTERN = re.compile(r"https?://[^\s<>()]+", re.IGNORECASE)
 USERNAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,}$")
 

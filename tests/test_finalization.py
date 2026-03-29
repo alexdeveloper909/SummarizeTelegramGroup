@@ -141,6 +141,7 @@ class FinalizationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(0, count_raw_messages(self.connection, "run-finalize"))
         self.assertEqual("finalized", get_run(self.connection, "run-finalize")["status"])
         self.assertGreaterEqual(result["purged_rows"], 1)
+        self.assertIn(f"/{self.now.strftime('%d.%m.%Y')}/report/", result["report_output_path"])
 
     async def test_finalization_is_retry_safe(self) -> None:
         fake_client = await self._collect_run("run-idempotent")

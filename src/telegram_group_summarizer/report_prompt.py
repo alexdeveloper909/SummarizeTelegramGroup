@@ -4,12 +4,9 @@ from pathlib import Path
 from typing import Optional
 
 from .models import SummaryBundle
+from .report_layout import default_report_prompt_path
 
 DEFAULT_REPORT_LANGUAGE = "Ukrainian"
-
-
-def default_report_prompt_path(reports_dir: Path, run_id: str) -> Path:
-    return reports_dir / f"{run_id}.report_prompt.md"
 
 
 def build_report_prompt(
@@ -104,6 +101,7 @@ def write_report_prompt(
     final_output_path = output_path or default_report_prompt_path(
         reports_dir,
         str(bundle.run["run_id"]),
+        str(bundle.run["started_at"]),
     )
     final_output_path.parent.mkdir(parents=True, exist_ok=True)
     final_output_path.write_text(

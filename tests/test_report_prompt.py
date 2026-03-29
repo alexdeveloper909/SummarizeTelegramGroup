@@ -162,6 +162,9 @@ class ReportPromptTests(unittest.IsolatedAsyncioTestCase):
             reports_dir=self.config.reports_dir,
         )
 
+        expected_date = now.strftime("%d.%m.%Y")
+        self.assertEqual("report_prompt", output_path.parent.name)
+        self.assertEqual(expected_date, output_path.parent.parent.name)
         self.assertTrue(output_path.name.endswith(".report_prompt.md"))
         self.assertTrue(output_path.exists())
         prompt_text = output_path.read_text(encoding="utf-8")

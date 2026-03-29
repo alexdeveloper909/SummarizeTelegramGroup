@@ -126,11 +126,14 @@ class IntegrationFlowTests(unittest.IsolatedAsyncioTestCase):
             run_id="run-integration",
             config=self.config,
         )
+        expected_date = now.strftime("%d.%m.%Y")
         self.assertEqual(2, len(bundle.messages))
         self.assertEqual("lookback", collect_result["mode"])
         self.assertTrue(str(context["report_prompt_path"]).endswith(".report_prompt.md"))
+        self.assertIn(f"/{expected_date}/summary/", str(context["summary_json_path"]))
+        self.assertIn(f"/{expected_date}/report_prompt/", str(context["report_prompt_path"]))
 
-        store_report(
+        stored_path = store_report(
             self.connection,
             run_id="run-integration",
             report_markdown="# Headline summary\n\nA concise report.",
@@ -147,7 +150,9 @@ class IntegrationFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(["team_alpha"], client.marked_read)
         self.assertEqual("finalized", get_run(self.connection, "run-integration")["status"])
         self.assertEqual(0, count_raw_messages(self.connection, "run-integration"))
+        self.assertIn(f"/{expected_date}/report/", str(stored_path))
         self.assertTrue(finalization_result["report_output_path"].endswith(".report.md"))
+        self.assertIn(f"/{expected_date}/report/", finalization_result["report_output_path"])
 
 
 if __name__ == "__main__":

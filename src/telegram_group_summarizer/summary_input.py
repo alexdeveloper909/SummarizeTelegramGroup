@@ -135,8 +135,12 @@ def bundle_to_markdown(bundle: SummaryBundle) -> str:
         for message in bundle.messages:
             sender_name = message["sender_name"] or "Unknown"
             body = message["text_content"] or "[no text]"
+            message_line = (
+                f"- {message['message_timestamp']} | {sender_name} | "
+                f"#{message['telegram_message_id']} | {body}"
+            )
             lines.append(
-                f"- {message['message_timestamp']} | {sender_name} | #{message['telegram_message_id']} | {body}"
+                message_line
             )
     else:
         lines.append("- No messages staged for this run")

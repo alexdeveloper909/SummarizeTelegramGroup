@@ -4,12 +4,10 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from .config import AppConfig
+from .db import get_run_with_target
+from .report_layout import default_summary_output_prefix
 from .report_prompt import DEFAULT_REPORT_LANGUAGE, write_report_prompt
 from .summary_input import write_summary_bundle
-
-
-def default_summary_output_prefix(reports_dir: Path, run_id: str) -> Path:
-    return reports_dir / f"{run_id}.summary"
 
 
 def prepare_report_context(
@@ -21,9 +19,14 @@ def prepare_report_context(
     prompt_output_path: Optional[Path] = None,
     report_language: str = DEFAULT_REPORT_LANGUAGE,
 ) -> Dict[str, object]:
+    run = get_run_with_target(connection, run_id)
+    if run is None:
+        raise ValueError(f"Run {run_id} does not exist.")
+
     output_prefix = summary_output_prefix or default_summary_output_prefix(
         config.reports_dir,
         run_id,
+        str(run["started_at"]),
     )
     bundle, summary_paths = write_summary_bundle(
         connection,

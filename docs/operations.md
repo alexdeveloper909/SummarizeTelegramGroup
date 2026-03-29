@@ -9,6 +9,7 @@
 5. Finalize with `python3 scripts/finalize_run.py --run-id <run_id> --mark-read --purge-raw`.
 
 `prepare_summary_input.py` and `build_report_prompt.py` remain available when you need to rerun only one part of the preparation stage.
+Default artifact locations are grouped under `data/reports/DD.MM.YYYY/` so one run day contains separate `summary/`, `report_prompt/`, `draft/`, `report/`, and `final/` folders.
 
 ## Retry Paths
 
@@ -34,6 +35,7 @@
 ## Cleanup
 
 - Routine cleanup: `python3 scripts/purge_old_runs.py --older-than-hours 168`
+- Legacy flat report files can be reorganized with `PYTHONPATH=src python3 scripts/migrate_report_layout.py`
 - This script only removes raw rows for runs already marked `finalized`.
 - Failed runs are preserved for debugging and must be reviewed deliberately.
 

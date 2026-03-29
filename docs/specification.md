@@ -1,7 +1,7 @@
 # Telegram Group Summarizer Specification
 
 Status: Draft  
-Last updated: 2026-03-28
+Last updated: 2026-03-29
 
 ## 1. Purpose
 
@@ -184,6 +184,12 @@ This separation keeps Telegram access narrow, makes summarization reproducible, 
 ├── user_guide.md
 ├── data/
 │   ├── reports/
+│   │   └── DD.MM.YYYY/
+│   │       ├── draft/
+│   │       ├── final/
+│   │       ├── report/
+│   │       ├── report_prompt/
+│   │       └── summary/
 │   ├── sqlite/
 │   └── sessions/
 ├── docs/
@@ -224,6 +230,7 @@ This separation keeps Telegram access narrow, makes summarization reproducible, 
 ```
 
 The exact layout can change, but the boundary between scripts, library code, docs, and data should remain explicit.
+Within `data/reports/`, generated artifacts should be grouped by run date using `DD.MM.YYYY` directories so operators can browse one day's outputs at a time, while per-artifact subfolders keep summaries, prompts, drafts, stored reports, and promoted finals distinct.
 
 ## 12. Data Model Proposal
 

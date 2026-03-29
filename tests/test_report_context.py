@@ -115,10 +115,14 @@ class ReportContextTests(unittest.IsolatedAsyncioTestCase):
             config=self.config,
         )
 
+        expected_date = now.strftime("%d.%m.%Y")
         self.assertEqual("run-report-context", result["run_id"])
         self.assertTrue(str(result["summary_json_path"]).endswith(".summary.json"))
         self.assertTrue(str(result["summary_markdown_path"]).endswith(".summary.md"))
         self.assertTrue(str(result["report_prompt_path"]).endswith(".report_prompt.md"))
+        self.assertIn(f"/{expected_date}/summary/", str(result["summary_json_path"]))
+        self.assertIn(f"/{expected_date}/summary/", str(result["summary_markdown_path"]))
+        self.assertIn(f"/{expected_date}/report_prompt/", str(result["report_prompt_path"]))
         self.assertEqual(2, result["message_count"])
         self.assertTrue(Path(str(result["summary_json_path"])).exists())
         self.assertTrue(Path(str(result["summary_markdown_path"])).exists())

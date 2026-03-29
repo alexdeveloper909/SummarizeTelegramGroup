@@ -9,7 +9,6 @@ from typing import Dict, Iterable, List, Optional
 from .config import AppConfig, load_config
 from .models import NormalizedMessage, ResolvedTarget
 
-
 MIGRATION_VERSION = "0001_initial"
 
 

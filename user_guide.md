@@ -54,6 +54,7 @@ Optional environment variables:
 - `TELEGRAM_SUMMARIZER_LOG_LEVEL`: default `INFO`
 
 The manual report-delivery script also depends on `telegramify-markdown`, which uses a Python 3.10+ entity-based API.
+By default, generated report artifacts are stored under `data/reports/DD.MM.YYYY/` with separate `summary/`, `report_prompt/`, `draft/`, `report/`, and `final/` subfolders.
 
 ## Telegram Authentication Bootstrap
 
@@ -90,13 +91,13 @@ The collector prints a JSON payload including the `run_id`.
 Build agent-friendly summary input without calling Telegram again:
 
 ```bash
-python3.12 scripts/prepare_summary_input.py --run-id <RUN_ID> --format both --output data/reports/<RUN_ID>.summary
+python3.12 scripts/prepare_summary_input.py --run-id <RUN_ID> --format both --output data/reports/DD.MM.YYYY/summary/<RUN_ID>.summary
 ```
 
 This writes:
 
-- `data/reports/<RUN_ID>.summary.json`
-- `data/reports/<RUN_ID>.summary.md`
+- `data/reports/DD.MM.YYYY/summary/<RUN_ID>.summary.json`
+- `data/reports/DD.MM.YYYY/summary/<RUN_ID>.summary.md`
 
 If you omit `--output`, the script prints the requested format to stdout.
 
@@ -107,6 +108,11 @@ python3.12 scripts/prepare_report_context.py --run-id <RUN_ID>
 ```
 
 This writes the summary bundle and report brief together and prints a JSON payload with the generated file paths plus the collected message count.
+Without custom output arguments, the files are written under the run date:
+
+- `data/reports/DD.MM.YYYY/summary/<RUN_ID>.summary.json`
+- `data/reports/DD.MM.YYYY/summary/<RUN_ID>.summary.md`
+- `data/reports/DD.MM.YYYY/report_prompt/<RUN_ID>.report_prompt.md`
 
 ## Writing the Final Report
 
@@ -116,12 +122,12 @@ The summarization step is agent-driven. Once the report Markdown exists, persist
 python3.12 scripts/store_report.py --run-id <RUN_ID> --input-path report.md
 ```
 
-By default the report is written to `data/reports/<RUN_ID>.report.md` and also stored in the `generated_reports` table. Automation can capture either the emitted file path or the stored report record.
+By default the report is written to `data/reports/DD.MM.YYYY/report/<RUN_ID>.report.md` and also stored in the `generated_reports` table. Automation can capture either the emitted file path or the stored report record.
 
 To keep report writing consistent, generate a report brief first:
 
 ```bash
-python3.12 scripts/build_report_prompt.py --run-id <RUN_ID> --output data/reports/<RUN_ID>.report_prompt.md
+python3.12 scripts/build_report_prompt.py --run-id <RUN_ID> --output data/reports/DD.MM.YYYY/report_prompt/<RUN_ID>.report_prompt.md
 ```
 
 This file is meant to be the first input the agent reads. It gives a generic report contract plus run metadata, candidate URLs, and sender statistics before the agent works through the prepared message bundle.
@@ -222,6 +228,16 @@ One short paragraph describing why these signals deserve attention.
 - Empty prepared bundle: the target may genuinely have no unread or recent messages inside the lookback window.
 - Username or entity resolution failures: authenticate first and confirm the target is reachable from the logged-in Telegram account.
 - SQLite lock delays: keep the default WAL mode and busy timeout unless you have a reason to tune them.
+
+## Report Layout Migration
+
+If you still have older flat files directly under `data/reports/`, normalize them with:
+
+```bash
+PYTHONPATH=src python3.12 scripts/migrate_report_layout.py
+```
+
+Use `--dry-run` first if you want to preview the moves.
 
 ## Validation Commands
 

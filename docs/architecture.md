@@ -32,6 +32,7 @@ flowchart TD
 - `collection_runs`: per-invocation lifecycle state, message counts, error summaries, and finalization timestamps.
 - `raw_messages`: temporary normalized staging rows scoped by `run_id`.
 - `generated_reports`: stored final Markdown reports for successful or in-progress finalization flows.
+- `data/reports/DD.MM.YYYY/{summary,report_prompt,draft,report,final}`: on-disk artifact tree for one day's prepared bundles, prompts, drafts, canonical stored reports, and manually promoted finals.
 
 ## Target Resolution Rules
 

@@ -32,6 +32,7 @@ If implementation-specific docs are later added under `docs/`, prefer the most s
 - Do not purge staged raw data on failed runs.
 - Keep report delivery separate from the default summarization flow; do not add automatic outbound sending unless the user explicitly requests that scope change.
 - Do not hard-code delivery targets; prefer explicit CLI arguments and environment variables.
+- Keep report artifacts under `data/reports/DD.MM.YYYY/` and use the standard subfolders: `summary`, `report_prompt`, `draft`, `report`, and `final`.
 
 ## Security Notes
 
@@ -84,6 +85,7 @@ Standard local run flow:
 - `python3.12 scripts/send_markdown_report.py --input-path <report.md> --target <target>`
 
 The lower-level scripts `prepare_summary_input.py` and `build_report_prompt.py` remain available for debugging or partial reruns.
+Use `python3.12 scripts/migrate_report_layout.py` when older flat files in `data/reports/` need to be normalized into the dated folder layout.
 
 Minimum pre-merge validation:
 

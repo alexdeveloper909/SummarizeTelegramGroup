@@ -5,6 +5,7 @@ from typing import Optional
 
 from .config import AppConfig
 from .db import create_generated_report, get_run_with_target, update_run_status
+from .report_layout import default_report_path
 
 REPORT_SECTION_TITLES = [
     "Headline summary",
@@ -13,12 +14,6 @@ REPORT_SECTION_TITLES = [
     "Important links",
     "Action items or follow-ups",
 ]
-
-
-def default_report_path(config: AppConfig, run_id: str) -> Path:
-    return config.reports_dir / f"{run_id}.report.md"
-
-
 def store_report(
     connection,
     *,
@@ -31,7 +26,11 @@ def store_report(
     if run is None:
         raise ValueError(f"Run {run_id} does not exist.")
 
-    final_output_path = output_path or default_report_path(config, run_id)
+    final_output_path = output_path or default_report_path(
+        config.reports_dir,
+        run_id,
+        str(run["started_at"]),
+    )
     final_output_path.parent.mkdir(parents=True, exist_ok=True)
     final_output_path.write_text(report_markdown, encoding="utf-8")
 
