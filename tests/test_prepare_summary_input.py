@@ -323,6 +323,68 @@ class SummaryInputTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("forum_overview", bundle_json)
         self.assertIn("topic_groups", bundle_json)
 
+    async def test_forum_bundle_counts_distinct_sender_ids_when_names_are_missing(self) -> None:
+        now = datetime.now(timezone.utc)
+        resolved_target = ResolvedTarget(
+            target_key="forum_room_missing_names",
+            entity_id=105,
+            entity_type="channel",
+            display_name="Forum Missing Names",
+            reference=TargetReference(kind="username", value="forum_room_missing_names"),
+            is_forum=True,
+        )
+        topics = [
+            FakeForumTopic(
+                id=10,
+                title="Tax Thread",
+                top_message=100,
+                date=now - timedelta(hours=1),
+                unread_count=2,
+            )
+        ]
+        forum_messages = {
+            10: [
+                FakeMessage(
+                    id=101,
+                    date=now - timedelta(minutes=30),
+                    sender_id=1,
+                    sender=FakeSender("", ""),
+                    text="first",
+                    reply_to=FakeReply(100, 100, True),
+                ),
+                FakeMessage(
+                    id=102,
+                    date=now - timedelta(minutes=20),
+                    sender_id=2,
+                    sender=FakeSender("", ""),
+                    text="second",
+                    reply_to=FakeReply(101, 100, True),
+                ),
+            ]
+        }
+        client = FakeTelegramClient(
+            resolved_target,
+            forum_topics=topics,
+            forum_messages_by_topic=forum_messages,
+        )
+        await collect_messages_for_run(
+            connection=self.connection,
+            telegram_client=client,
+            target_value="forum_room_missing_names",
+            lookback_hours=24,
+            max_messages=10,
+            config=self.config,
+            run_id="run-forum-missing-names",
+            now=now,
+            target_mode="forum",
+        )
+
+        bundle = build_summary_bundle(self.connection, "run-forum-missing-names")
+
+        self.assertEqual(2, bundle.topic_index[0]["unique_sender_count"])
+        self.assertEqual("sender:1", bundle.sender_stats[0].sender_name)
+        self.assertEqual("sender:2", bundle.sender_stats[1].sender_name)
+
     async def test_empty_run_behavior_is_supported(self) -> None:
         now = datetime.now(timezone.utc)
         resolved_target = ResolvedTarget(

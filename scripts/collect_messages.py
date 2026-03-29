@@ -1,9 +1,14 @@
 from __future__ import annotations
+# ruff: noqa: E402, I001
 
 import argparse
 import asyncio
 import json
 import logging
+
+from _bootstrap import ensure_src_on_path
+
+ensure_src_on_path()
 
 from telegram_group_summarizer.collection import collect_messages_for_run
 from telegram_group_summarizer.config import load_config

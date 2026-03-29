@@ -42,6 +42,14 @@ def _raw_row_to_message(row) -> Dict[str, object]:
     }
 
 
+def _sender_bucket(sender_id: object, sender_name: object) -> str:
+    if sender_name:
+        return str(sender_name)
+    if sender_id is not None:
+        return f"sender:{sender_id}"
+    return "Unknown"
+
+
 def _base_bundle_parts(raw_messages) -> tuple[
     List[Dict[str, object]],
     List[str],
@@ -58,8 +66,7 @@ def _base_bundle_parts(raw_messages) -> tuple[
         message = _raw_row_to_message(row)
         messages.append(message)
 
-        sender_name = row["sender_name"] or "Unknown"
-        sender_counter[sender_name] += 1
+        sender_counter[_sender_bucket(row["sender_id"], row["sender_name"])] += 1
         if row["reply_to_message_id"] is not None:
             reply_threads[str(row["reply_to_message_id"])].append(int(row["telegram_message_id"]))
 
@@ -134,7 +141,10 @@ def _build_forum_sections(run, raw_messages, candidate_urls: List[str]):
     for row in active_topic_rows:
         topic_id = int(row["forum_topic_id"])
         topic_messages = grouped_messages.get(topic_id, [])
-        unique_senders = {message["sender_name"] or "Unknown" for message in topic_messages}
+        unique_senders = {
+            _sender_bucket(message["sender_id"], message["sender_name"])
+            for message in topic_messages
+        }
         collected_message_count = len(topic_messages)
         last_activity_timestamp = row["forum_topic_date"]
         if topic_messages:

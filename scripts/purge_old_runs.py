@@ -1,7 +1,12 @@
 from __future__ import annotations
+# ruff: noqa: E402, I001
 
 import argparse
 from datetime import datetime, timedelta, timezone
+
+from _bootstrap import ensure_src_on_path
+
+ensure_src_on_path()
 
 from telegram_group_summarizer.config import load_config
 from telegram_group_summarizer.db import delete_raw_messages, ensure_database

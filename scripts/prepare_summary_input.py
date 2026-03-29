@@ -1,8 +1,13 @@
 from __future__ import annotations
+# ruff: noqa: E402, I001
 
 import argparse
 import json
 from pathlib import Path
+
+from _bootstrap import ensure_src_on_path
+
+ensure_src_on_path()
 
 from telegram_group_summarizer.config import load_config
 from telegram_group_summarizer.db import ensure_database
