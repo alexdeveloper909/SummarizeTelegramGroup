@@ -1,6 +1,6 @@
 # User Guide
 
-This project collects Telegram messages for a single target, stages normalized rows in local SQLite, prepares an agent-friendly summary bundle, stores a final report, and only then marks the Telegram target as read and purges staged raw rows. It also supports an explicit manual step for sending an existing Markdown report into a Telegram chat.
+This project collects Telegram messages for a single target, stages normalized rows in local SQLite, prepares an agent-friendly summary bundle, stores a final report, and only then marks the covered Telegram content as read and purges staged raw rows. It also supports an explicit manual step for sending an existing Markdown report into a Telegram chat.
 
 Use [docs/specification.md](docs/specification.md) for the detailed contract. Use this guide for setup and normal operations.
 
@@ -76,6 +76,18 @@ Collect unread messages first, with a lookback fallback:
 python3.12 scripts/collect_messages.py --target team_alpha --lookback-hours 24 --max-messages 500
 ```
 
+Forum-aware collection uses the same script:
+
+```bash
+python3.12 scripts/collect_messages.py \
+  --target product_forum \
+  --target-mode forum \
+  --lookback-hours 24 \
+  --max-messages 500 \
+  --forum-topic-probe-messages 3 \
+  --forum-max-messages-per-topic 50
+```
+
 `--target` accepts:
 
 - an existing `report_targets.target_key` alias
@@ -83,6 +95,18 @@ python3.12 scripts/collect_messages.py --target team_alpha --lookback-hours 24 -
 - a numeric Telegram entity ID such as `-1001234567890`
 
 If an existing alias row is present in SQLite, alias resolution wins over username parsing.
+
+`--target-mode` supports:
+
+- `auto`: default; detect forum-enabled targets automatically
+- `chat`: force flat chat/channel behavior
+- `forum`: force forum behavior and fail if the target is not forum-enabled
+
+Optional forum tuning flags:
+
+- `--forum-topic-limit`
+- `--forum-topic-probe-messages`
+- `--forum-max-messages-per-topic`
 
 The collector prints a JSON payload including the `run_id`.
 
@@ -113,6 +137,13 @@ Without custom output arguments, the files are written under the run date:
 - `data/reports/DD.MM.YYYY/summary/<RUN_ID>.summary.json`
 - `data/reports/DD.MM.YYYY/summary/<RUN_ID>.summary.md`
 - `data/reports/DD.MM.YYYY/report_prompt/<RUN_ID>.report_prompt.md`
+
+For forum runs, the prepared bundle becomes topic-aware. The Markdown bundle prefers:
+
+- a forum overview
+- a ranked topic radar
+- compact excerpts for the most important threads
+- a short other-activity section for collapsed low-signal topics
 
 ## Writing the Final Report
 
@@ -174,6 +205,7 @@ Useful variants:
 - `python3.12 scripts/finalize_run.py --run-id <RUN_ID> --mark-read`
 
 `finalize_run.py` refuses to finalize a run that has no stored report.
+For forum runs, `--mark-read` acknowledges only the collected topic threads; it does not mark the entire forum as read.
 
 ## End-to-End Dry Run Example
 

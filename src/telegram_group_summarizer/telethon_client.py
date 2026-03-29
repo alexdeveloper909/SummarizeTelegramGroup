@@ -5,21 +5,39 @@ from typing import Iterable, List, Optional
 
 from .collection import normalize_datetime
 from .config import AppConfig
-from .models import ResolvedTarget, TargetReference
+from .models import ForumTopicSnapshot, ResolvedTarget, TargetReference
 
 
-def create_telethon_client(config: AppConfig, session_name: Optional[str] = None):
+def _missing_telethon_error(exc: ImportError) -> RuntimeError:
+    error = RuntimeError(
+        "Telethon is required for Telegram access. Install it with `pip install '.[telegram]'`."
+    )
+    error.__cause__ = exc
+    return error
+
+
+def _load_telethon_client():
     try:
         from telethon import TelegramClient
     except ImportError as exc:
-        raise RuntimeError(
-            "Telethon is required for Telegram access. Install it with `pip install '.[telegram]'`."
-        ) from exc
+        raise _missing_telethon_error(exc)
+    return TelegramClient
 
+
+def _load_telethon_functions():
+    try:
+        from telethon import functions
+    except ImportError as exc:
+        raise _missing_telethon_error(exc)
+    return functions
+
+
+def create_telethon_client(config: AppConfig, session_name: Optional[str] = None):
+    telegram_client = _load_telethon_client()
     resolved_session_name = session_name or config.session_name
     session_path = config.sessions_dir / resolved_session_name
     session_path.parent.mkdir(parents=True, exist_ok=True)
-    return TelegramClient(str(session_path), config.telegram_api_id, config.telegram_api_hash)
+    return telegram_client(str(session_path), config.telegram_api_id, config.telegram_api_hash)
 
 
 class TelethonWorkflowClient:
@@ -52,6 +70,7 @@ class TelethonWorkflowClient:
             entity_type=entity_type,
             display_name=display_name,
             reference=reference,
+            is_forum=bool(getattr(entity, "forum", False)),
         )
 
     async def fetch_unread_messages(self, target: ResolvedTarget, limit: int):
@@ -75,9 +94,89 @@ class TelethonWorkflowClient:
         messages.reverse()
         return messages
 
+    async def fetch_forum_topics(self, target: ResolvedTarget, limit: Optional[int] = None):
+        functions = _load_telethon_functions()
+        input_entity = await self._input_entity(target)
+        topics: List[object] = []
+        offset_date = None
+        offset_id = 0
+        offset_topic = 0
+        remaining = limit
+
+        while remaining is None or remaining > 0:
+            page_limit = min(100, remaining) if remaining is not None else 100
+            response = await self.client(
+                functions.messages.GetForumTopicsRequest(
+                    channel=input_entity,
+                    offset_date=offset_date,
+                    offset_id=offset_id,
+                    offset_topic=offset_topic,
+                    limit=page_limit,
+                    q=None,
+                )
+            )
+            page_topics = list(getattr(response, "topics", []) or [])
+            if not page_topics:
+                break
+            topics.extend(page_topics)
+            if remaining is not None:
+                remaining -= len(page_topics)
+                if remaining <= 0:
+                    break
+            last_topic = page_topics[-1]
+            offset_date = getattr(last_topic, "date", None)
+            offset_id = int(getattr(last_topic, "top_message", 0) or 0)
+            offset_topic = int(getattr(last_topic, "id", 0) or 0)
+            if len(page_topics) < page_limit:
+                break
+        return topics
+
+    async def fetch_forum_topic_messages(
+        self,
+        target: ResolvedTarget,
+        topic: ForumTopicSnapshot,
+        *,
+        limit: int,
+    ):
+        functions = _load_telethon_functions()
+        input_entity = await self._input_entity(target)
+        response = await self.client(
+            functions.messages.GetRepliesRequest(
+                peer=input_entity,
+                msg_id=topic.forum_topic_top_message_id,
+                offset_id=0,
+                offset_date=None,
+                add_offset=0,
+                limit=limit,
+                max_id=0,
+                min_id=0,
+                hash=0,
+            )
+        )
+        messages = list(getattr(response, "messages", []) or [])
+        messages.reverse()
+        return messages
+
     async def mark_target_read(self, target: ResolvedTarget) -> None:
         input_entity = await self._input_entity(target)
         await self.client.send_read_acknowledge(input_entity)
+
+    async def mark_forum_topic_read(
+        self,
+        target: ResolvedTarget,
+        *,
+        topic_top_message_id: int,
+        highest_message_id: int,
+    ) -> None:
+        functions = _load_telethon_functions()
+        input_entity = await self._input_entity(target)
+        await self.client(
+            functions.messages.ReadDiscussionRequest(
+                peer=input_entity,
+                msg_id=topic_top_message_id,
+                read_max_id=highest_message_id,
+            )
+        )
 
     async def send_text_message(
         self,

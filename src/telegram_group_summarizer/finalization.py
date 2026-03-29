@@ -5,9 +5,26 @@ from .db import (
     delete_raw_messages,
     get_generated_report,
     get_run_with_target,
+    list_forum_topic_read_points,
     update_run_status,
 )
 from .models import ResolvedTarget, TargetReference
+
+
+async def _mark_run_read(connection, telegram_client, run, resolved_target: ResolvedTarget) -> None:
+    if telegram_client is None:
+        raise ValueError("A Telegram client is required when mark_read is requested.")
+
+    if (run["target_mode"] or "chat") == "forum":
+        for topic_read_point in list_forum_topic_read_points(connection, run["run_id"]):
+            await telegram_client.mark_forum_topic_read(
+                resolved_target,
+                topic_top_message_id=int(topic_read_point["forum_topic_top_message_id"]),
+                highest_message_id=int(topic_read_point["highest_message_id"]),
+            )
+        return
+
+    await telegram_client.mark_target_read(resolved_target)
 
 
 async def finalize_run(
@@ -32,13 +49,12 @@ async def finalize_run(
         entity_type=run["telegram_entity_type"],
         display_name=run["target_display_name"],
         reference=TargetReference(kind="target_key", value=run["target_key"]),
+        is_forum=(run["target_mode"] or "chat") == "forum",
     )
 
     try:
         if mark_read and run["read_marked_at"] is None:
-            if telegram_client is None:
-                raise ValueError("A Telegram client is required when mark_read is requested.")
-            await telegram_client.mark_target_read(resolved_target)
+            await _mark_run_read(connection, telegram_client, run, resolved_target)
             update_run_status(connection, run_id, status="summarized", read_marked=True)
 
         purged_rows = 0
@@ -52,6 +68,7 @@ async def finalize_run(
             "marked_read": bool(mark_read),
             "purged_rows": purged_rows,
             "report_output_path": report["output_path"],
+            "target_mode": run["target_mode"] or "chat",
         }
     except Exception as exc:
         update_run_status(

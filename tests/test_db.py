@@ -47,9 +47,21 @@ class DatabaseTests(unittest.TestCase):
         self.assertIn("collection_runs", tables)
         self.assertIn("raw_messages", tables)
         self.assertIn("generated_reports", tables)
+        self.assertIn("run_forum_topics", tables)
 
-        migration = self.connection.execute("SELECT version FROM schema_migrations").fetchone()
+        migration = self.connection.execute(
+            "SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1"
+        ).fetchone()
         self.assertEqual(MIGRATION_VERSION, migration["version"])
+
+        raw_message_columns = {
+            row["name"]
+            for row in self.connection.execute("PRAGMA table_info(raw_messages)").fetchall()
+        }
+        self.assertIn("forum_topic_id", raw_message_columns)
+        self.assertIn("forum_topic_top_message_id", raw_message_columns)
+        self.assertIn("reply_to_top_message_id", raw_message_columns)
+        self.assertIn("is_forum_topic_message", raw_message_columns)
 
         journal_mode = self.connection.execute("PRAGMA journal_mode").fetchone()[0]
         self.assertEqual("wal", str(journal_mode).lower())

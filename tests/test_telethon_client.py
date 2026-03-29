@@ -3,8 +3,10 @@ from __future__ import annotations
 import unittest
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from telegram_group_summarizer.models import ResolvedTarget, TargetReference
+from telegram_group_summarizer.models import ForumTopicSnapshot, ResolvedTarget, TargetReference
 from telegram_group_summarizer.telethon_client import TelethonWorkflowClient
 
 
@@ -19,19 +21,46 @@ class FakeMessage:
 class FakeEntity:
     id: int
     title: str
+    forum: bool = False
+
+
+@dataclass
+class FakeRequest:
+    name: str
+    kwargs: dict
+
+
+class FakeTelethonFunctions:
+    class messages:
+        @staticmethod
+        def GetForumTopicsRequest(**kwargs):
+            return FakeRequest("GetForumTopicsRequest", kwargs)
+
+        @staticmethod
+        def GetRepliesRequest(**kwargs):
+            return FakeRequest("GetRepliesRequest", kwargs)
+
+        @staticmethod
+        def ReadDiscussionRequest(**kwargs):
+            return FakeRequest("ReadDiscussionRequest", kwargs)
 
 
 class FakeTelethonClient:
-    def __init__(self, messages=None) -> None:
+    def __init__(self, messages=None, forum_topics=None, replies=None) -> None:
         self.messages = messages if messages is not None else []
+        self.forum_topics = forum_topics if forum_topics is not None else []
+        self.replies = replies if replies is not None else []
         self.get_entity_calls = []
         self.get_input_entity_calls = []
         self.iter_messages_calls = []
         self.read_ack_calls = []
         self.send_message_calls = []
+        self.request_calls = []
 
     async def get_entity(self, value):
         self.get_entity_calls.append(value)
+        if value == "forum-room":
+            return FakeEntity(id=1843781678, title="Forum Room", forum=True)
         return FakeEntity(id=1843781678, title="Numeric Group")
 
     async def get_input_entity(self, value):
@@ -50,6 +79,16 @@ class FakeTelethonClient:
         self.send_message_calls.append((entity, kwargs))
         return {"id": 99}
 
+    async def __call__(self, request):
+        self.request_calls.append(request)
+        if request.name == "GetForumTopicsRequest":
+            return SimpleNamespace(topics=list(self.forum_topics))
+        if request.name == "GetRepliesRequest":
+            return SimpleNamespace(messages=list(self.replies))
+        if request.name == "ReadDiscussionRequest":
+            return SimpleNamespace(ok=True)
+        raise AssertionError(f"Unexpected request {request.name}")
+
 
 class TelethonWorkflowClientTests(unittest.IsolatedAsyncioTestCase):
     async def test_resolve_target_converts_numeric_entity_id_to_int(self) -> None:
@@ -63,6 +102,19 @@ class TelethonWorkflowClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([-1001843781678], client.get_entity_calls)
         self.assertEqual("-1001843781678", resolved.target_key)
         self.assertEqual(1843781678, resolved.entity_id)
+        self.assertFalse(resolved.is_forum)
+
+    async def test_resolve_target_marks_forum_enabled_entities(self) -> None:
+        client = FakeTelethonClient()
+        workflow_client = TelethonWorkflowClient(client)
+
+        resolved = await workflow_client.resolve_target(
+            TargetReference(kind="username", value="forum-room")
+        )
+
+        self.assertEqual(["forum-room"], client.get_entity_calls)
+        self.assertTrue(resolved.is_forum)
+        self.assertEqual("Forum Room", resolved.display_name)
 
     async def test_numeric_target_key_uses_input_entity_for_fetch_and_mark_read(self) -> None:
         client = FakeTelethonClient(
@@ -84,6 +136,66 @@ class TelethonWorkflowClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([("input:-1001843781678", 10)], client.iter_messages_calls)
         self.assertEqual(["input:-1001843781678"], client.read_ack_calls)
         self.assertEqual(1, len(messages))
+
+    async def test_forum_methods_use_discussion_requests(self) -> None:
+        client = FakeTelethonClient(
+            forum_topics=[
+                SimpleNamespace(
+                    id=10,
+                    title="Launch",
+                    top_message=100,
+                    date=datetime.now(timezone.utc),
+                )
+            ],
+            replies=[
+                FakeMessage(id=101, date=datetime.now(timezone.utc), unread=True),
+                FakeMessage(id=102, date=datetime.now(timezone.utc), unread=True),
+            ],
+        )
+        workflow_client = TelethonWorkflowClient(client)
+        target = ResolvedTarget(
+            target_key="forum-room",
+            entity_id=1843781678,
+            entity_type="channel",
+            display_name="Forum Room",
+            reference=TargetReference(kind="username", value="forum-room"),
+            is_forum=True,
+        )
+        topic = ForumTopicSnapshot(
+            run_id="run-1",
+            target_id=7,
+            forum_topic_id=10,
+            forum_topic_title="Launch",
+            forum_topic_top_message_id=100,
+            forum_topic_date=datetime.now(timezone.utc),
+            unread_count=1,
+            unread_mentions_count=0,
+            unread_reactions_count=0,
+            is_pinned=False,
+            is_closed=False,
+            is_hidden=False,
+        )
+
+        with patch(
+            "telegram_group_summarizer.telethon_client._load_telethon_functions",
+            return_value=FakeTelethonFunctions,
+        ):
+            topics = await workflow_client.fetch_forum_topics(target, limit=10)
+            replies = await workflow_client.fetch_forum_topic_messages(target, topic, limit=5)
+            await workflow_client.mark_forum_topic_read(
+                target,
+                topic_top_message_id=100,
+                highest_message_id=102,
+            )
+
+        self.assertEqual(["forum-room"] * 3, client.get_input_entity_calls)
+        self.assertEqual(1, len(topics))
+        self.assertEqual([102, 101], [message.id for message in replies])
+        self.assertEqual(
+            ["GetForumTopicsRequest", "GetRepliesRequest", "ReadDiscussionRequest"],
+            [request.name for request in client.request_calls],
+        )
+        self.assertEqual(102, client.request_calls[-1].kwargs["read_max_id"])
 
     async def test_send_text_message_reuses_input_entity_lookup(self) -> None:
         client = FakeTelethonClient()

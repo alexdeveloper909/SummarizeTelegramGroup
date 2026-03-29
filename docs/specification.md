@@ -7,7 +7,7 @@ Last updated: 2026-03-29
 
 Build a local, automation-friendly project that can:
 
-1. Read Telegram messages from a configured group or channel.
+1. Read Telegram messages from a configured group, channel, or forum-enabled supergroup.
 2. Extract the important signals from unread content or, at most, the last 24 hours of content.
 3. Produce a clear human-readable report.
 4. Mark the processed Telegram messages as read after the run completes successfully.
@@ -22,7 +22,7 @@ The user is a member of multiple Telegram groups and does not have time to read 
 
 ## 3. Goals
 
-- Support scheduled automation runs for one Telegram target per invocation.
+- Support scheduled automation runs for one Telegram target per invocation, including forum-enabled targets.
 - Collect messages with enough metadata to enable downstream summarization and report writing.
 - Persist collected data locally in SQLite so the summarization stage does not depend on a live Telegram connection.
 - Allow multiple automation runs for different targets at the same time.
@@ -72,8 +72,10 @@ Daily automation run:
 ### 8.1 Message Collection
 
 - The system must collect messages for one configured Telegram target per run.
+- The collector must support `auto`, `chat`, and `forum` target modes.
 - The system must support both unread-message mode and lookback-window mode.
 - The effective fetch scope must never exceed the configured maximum lookback window, defaulting to 24 hours.
+- For forum targets, the collector must snapshot topic metadata, preserve topic IDs on collected messages, and avoid flattening topic threads into one undifferentiated history.
 - The collector must capture enough metadata for downstream summarization, including:
   - Telegram target ID
   - Message ID
@@ -108,6 +110,7 @@ Daily automation run:
 ### 8.4 Completion Behavior
 
 - After the report is successfully produced, the run must mark the Telegram target as read.
+- For forum targets, read acknowledgement must be topic-scoped and limited to the collected discussion threads.
 - After successful report generation and delivery, staged raw message rows for that run must be deleted.
 - If the run fails before the report is finalized, raw rows must remain available for retry and debugging.
 

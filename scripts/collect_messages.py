@@ -17,8 +17,31 @@ async def main() -> None:
     parser.add_argument(
         "--target", required=True, help="Target key, username, or Telegram entity ID."
     )
+    parser.add_argument(
+        "--target-mode",
+        choices=["auto", "chat", "forum"],
+        default="auto",
+        help="Target handling mode. Auto-detect forums by default.",
+    )
     parser.add_argument("--lookback-hours", type=int, help="Lookback window in hours.")
     parser.add_argument("--max-messages", type=int, help="Maximum number of messages to collect.")
+    parser.add_argument(
+        "--forum-topic-limit",
+        type=int,
+        help="Optional cap on forum topics to inspect during one run.",
+    )
+    parser.add_argument(
+        "--forum-topic-probe-messages",
+        type=int,
+        default=3,
+        help="Coverage-pass message count fetched per active forum topic.",
+    )
+    parser.add_argument(
+        "--forum-max-messages-per-topic",
+        type=int,
+        default=50,
+        help="Maximum total collected messages per forum topic.",
+    )
     parser.add_argument("--run-id", help="Optional run identifier supplied by the orchestrator.")
     args = parser.parse_args()
 
@@ -41,6 +64,10 @@ async def main() -> None:
             max_messages=max_messages,
             config=config,
             run_id=args.run_id,
+            target_mode=args.target_mode,
+            forum_topic_limit=args.forum_topic_limit,
+            forum_topic_probe_messages=args.forum_topic_probe_messages,
+            forum_max_messages_per_topic=args.forum_max_messages_per_topic,
         )
 
     logging.getLogger(__name__).info(

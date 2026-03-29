@@ -11,7 +11,7 @@ This repository is building toward an automation-oriented Telegram group summari
 - finalizes the run by marking the Telegram target as read and purging staged raw data
 - optionally delivers an already-written report to a chosen Telegram chat when explicitly requested
 
-The repository now contains a working local pipeline. Read the documentation before writing code.
+The repository now contains a working local pipeline for both flat Telegram targets and forum-enabled supergroups. Read the documentation before writing code.
 
 ## Required Reading Order
 
@@ -24,11 +24,13 @@ If implementation-specific docs are later added under `docs/`, prefer the most s
 ## Working Rules
 
 - Treat `docs/specification.md` as the current source of truth for scope and architecture.
+- Treat `docs/forum_support_specification.md` as the source of truth for forum-aware collection, bundle shaping, and finalization behavior.
 - Keep data collection separate from summarization logic.
 - Do not add hidden constants for Telegram targets, secrets, or local paths.
 - Prefer explicit CLI arguments and environment variables.
 - Keep raw Telegram data retention minimal.
 - Do not mark Telegram messages as read until a report has been successfully produced.
+- For forum runs, never replace topic-scoped read acknowledgement with chat-wide read acknowledgement.
 - Do not purge staged raw data on failed runs.
 - Keep report delivery separate from the default summarization flow; do not add automatic outbound sending unless the user explicitly requests that scope change.
 - Do not hard-code delivery targets; prefer explicit CLI arguments and environment variables.
@@ -100,6 +102,7 @@ Minimum pre-merge validation:
 - When you change project structure or operating conventions, update both `PROJECT_OVERVIEW.md` and `AGENTS.md`.
 - If a task concerns Telegram semantics, storage contracts, or cleanup behavior, check the specification before making assumptions.
 - Alias mapping currently lives in `report_targets.target_key`. Existing rows take precedence over username parsing during target resolution.
+- For forum targets, preserve topic metadata in `run_forum_topics` and keep forum message rows annotated with topic IDs and topic root message IDs.
 - When preparing or reviewing report output, rely on the prepared bundle and let the model determine what matters.
 - When writing a final report, use the generated report prompt/brief before falling back to the full bundle.
 - When delivering a report to Telegram, use the dedicated delivery script and keep it opt-in; never wire it into the standard collection/store/finalize pipeline without explicit user approval.

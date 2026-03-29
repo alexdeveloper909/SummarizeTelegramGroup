@@ -3,7 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from telegram_group_summarizer.collection import collect_messages_for_run
@@ -21,6 +21,13 @@ class FakeSender:
 
 
 @dataclass
+class FakeReply:
+    reply_to_msg_id: int
+    reply_to_top_id: int | None = None
+    forum_topic: bool = False
+
+
+@dataclass
 class FakeMessage:
     id: int
     date: datetime
@@ -29,12 +36,35 @@ class FakeMessage:
     text: str
     reply_to_msg_id: int | None = None
     unread: bool = False
+    reply_to: FakeReply | None = None
+
+
+@dataclass
+class FakeForumTopic:
+    id: int
+    title: str
+    top_message: int
+    date: datetime
+    unread_count: int = 0
+    unread_mentions_count: int = 0
+    unread_reactions_count: int = 0
+    pinned: bool = False
+    closed: bool = False
+    hidden: bool = False
 
 
 class FakeTelegramClient:
-    def __init__(self, resolved_target: ResolvedTarget, lookback_messages=None):
+    def __init__(
+        self,
+        resolved_target: ResolvedTarget,
+        lookback_messages=None,
+        forum_topics=None,
+        forum_messages_by_topic=None,
+    ):
         self.resolved_target = resolved_target
         self.lookback_messages = lookback_messages if lookback_messages is not None else []
+        self.forum_topics = forum_topics if forum_topics is not None else []
+        self.forum_messages_by_topic = forum_messages_by_topic or {}
 
     async def resolve_target(self, reference: TargetReference) -> ResolvedTarget:
         return self.resolved_target
@@ -44,6 +74,14 @@ class FakeTelegramClient:
 
     async def fetch_messages_since(self, target: ResolvedTarget, since: datetime, limit: int):
         return list(self.lookback_messages)[:limit]
+
+    async def fetch_forum_topics(self, target: ResolvedTarget, limit=None):
+        if limit is None:
+            return list(self.forum_topics)
+        return list(self.forum_topics)[:limit]
+
+    async def fetch_forum_topic_messages(self, target: ResolvedTarget, topic, *, limit: int):
+        return list(self.forum_messages_by_topic.get(topic.forum_topic_id, []))[:limit]
 
 
 class ReportPromptTests(unittest.IsolatedAsyncioTestCase):
@@ -71,7 +109,7 @@ class ReportPromptTests(unittest.IsolatedAsyncioTestCase):
         self.connection.close()
         self.temp_dir.cleanup()
 
-    async def test_report_prompt_prioritizes_compact_sections(self) -> None:
+    async def test_flat_report_prompt_prioritizes_compact_sections(self) -> None:
         now = datetime.now(timezone.utc)
         resolved_target = ResolvedTarget(
             target_key="team_alpha",
@@ -121,13 +159,69 @@ class ReportPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Source Target Display Name: Team Alpha", prompt)
         self.assertIn("Source Target Key: team_alpha", prompt)
         self.assertIn("## Final Reminder", prompt)
-        self.assertNotIn("Low-confidence items or uncertainties", prompt)
+        self.assertNotIn("Cross-topic developments", prompt)
+
+    async def test_forum_report_prompt_injects_cross_topic_guidance(self) -> None:
+        now = datetime.now(timezone.utc)
+        resolved_target = ResolvedTarget(
+            target_key="forum_room",
+            entity_id=202,
+            entity_type="channel",
+            display_name="Forum Room",
+            reference=TargetReference(kind="username", value="forum_room"),
+            is_forum=True,
+        )
+        client = FakeTelegramClient(
+            resolved_target,
+            forum_topics=[
+                FakeForumTopic(
+                    id=10,
+                    title="Launch",
+                    top_message=100,
+                    date=now - timedelta(hours=1),
+                    unread_count=2,
+                )
+            ],
+            forum_messages_by_topic={
+                10: [
+                    FakeMessage(
+                        id=101,
+                        date=now - timedelta(minutes=20),
+                        sender_id=1,
+                        sender=FakeSender("Alice", "Smith"),
+                        text="Launch topic https://launch.test",
+                        reply_to=FakeReply(100, 100, True),
+                    )
+                ]
+            },
+        )
+        await collect_messages_for_run(
+            connection=self.connection,
+            telegram_client=client,
+            target_value="forum_room",
+            lookback_hours=24,
+            max_messages=10,
+            config=self.config,
+            run_id="run-forum-report-prompt",
+            now=now,
+            target_mode="forum",
+        )
+
+        bundle = build_summary_bundle(self.connection, "run-forum-report-prompt")
+        prompt = build_report_prompt(bundle)
+
+        self.assertIn("forum-wide Telegram summary report", prompt)
+        self.assertIn("Cross-topic developments", prompt)
+        self.assertIn("Notable topic threads", prompt)
+        self.assertIn("Forum Overview", prompt)
+        self.assertIn("Topic Radar", prompt)
+        self.assertIn("one report for the whole forum", prompt)
 
     async def test_write_report_prompt_persists_output(self) -> None:
         now = datetime.now(timezone.utc)
         resolved_target = ResolvedTarget(
             target_key="quiet_room",
-            entity_id=202,
+            entity_id=203,
             entity_type="channel",
             display_name="Quiet Room",
             reference=TargetReference(kind="username", value="quiet_room"),

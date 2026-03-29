@@ -1,6 +1,6 @@
 # Telegram Forum Support Specification
 
-Status: Proposed
+Status: Implemented
 Last updated: 2026-03-29
 
 ## 1. Purpose

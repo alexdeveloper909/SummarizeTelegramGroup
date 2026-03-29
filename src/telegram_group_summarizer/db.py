@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 from .config import AppConfig, load_config
-from .models import NormalizedMessage, ResolvedTarget
+from .models import ForumTopicSnapshot, NormalizedMessage, ResolvedTarget
 
-MIGRATION_VERSION = "0001_initial"
+MIGRATION_VERSION = "0002_forum_support"
 
 
 def utc_now() -> str:
@@ -34,14 +34,31 @@ def ensure_database(config: Optional[AppConfig] = None) -> sqlite3.Connection:
 
 
 def apply_migrations(connection: sqlite3.Connection) -> None:
-    migration_sql = (
-        files("telegram_group_summarizer").joinpath("migrations/0001_initial.sql").read_text()
-    )
-    connection.executescript(migration_sql)
     connection.execute(
-        "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(?, ?)",
-        (MIGRATION_VERSION, utc_now()),
+        """
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version TEXT PRIMARY KEY,
+            applied_at TEXT NOT NULL
+        )
+        """
     )
+    migrations_dir = files("telegram_group_summarizer").joinpath("migrations")
+    applied_versions = {
+        row["version"]
+        for row in connection.execute("SELECT version FROM schema_migrations").fetchall()
+    }
+
+    for migration_path in sorted(migrations_dir.iterdir(), key=lambda path: path.name):
+        if migration_path.suffix != ".sql":
+            continue
+        version = migration_path.stem
+        if version in applied_versions:
+            continue
+        connection.executescript(migration_path.read_text())
+        connection.execute(
+            "INSERT INTO schema_migrations(version, applied_at) VALUES(?, ?)",
+            (version, utc_now()),
+        )
     connection.commit()
 
 
@@ -103,14 +120,21 @@ def create_collection_run(
     run_id: str,
     target_id: int,
     lookback_hours: int,
+    target_mode: Optional[str] = None,
     status: str = "started",
 ) -> None:
     connection.execute(
         """
-        INSERT INTO collection_runs(run_id, target_id, started_at, status, lookback_hours)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO collection_runs(
+            run_id,
+            target_id,
+            started_at,
+            status,
+            lookback_hours,
+            target_mode
+        ) VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (run_id, target_id, utc_now(), status, lookback_hours),
+        (run_id, target_id, utc_now(), status, lookback_hours, target_mode),
     )
     connection.commit()
 
@@ -121,7 +145,10 @@ def update_run_status(
     *,
     status: str,
     mode: Optional[str] = None,
+    target_mode: Optional[str] = None,
     message_count: Optional[int] = None,
+    forum_topic_count: Optional[int] = None,
+    forum_active_topic_count: Optional[int] = None,
     error_summary: Optional[str] = None,
     resolved_target: Optional[ResolvedTarget] = None,
     completed: bool = False,
@@ -136,7 +163,16 @@ def update_run_status(
     values: Dict[str, object] = {
         "status": status,
         "mode": mode if mode is not None else run["mode"],
+        "target_mode": target_mode if target_mode is not None else run["target_mode"],
         "message_count": message_count if message_count is not None else run["message_count"],
+        "forum_topic_count": (
+            forum_topic_count if forum_topic_count is not None else run["forum_topic_count"]
+        ),
+        "forum_active_topic_count": (
+            forum_active_topic_count
+            if forum_active_topic_count is not None
+            else run["forum_active_topic_count"]
+        ),
         "error_summary": error_summary if error_summary is not None else run["error_summary"],
         "resolved_entity_id": run["resolved_entity_id"],
         "resolved_entity_type": run["resolved_entity_type"],
@@ -163,7 +199,10 @@ def update_run_status(
         UPDATE collection_runs
         SET status = :status,
             mode = :mode,
+            target_mode = :target_mode,
             message_count = :message_count,
+            forum_topic_count = :forum_topic_count,
+            forum_active_topic_count = :forum_active_topic_count,
             error_summary = :error_summary,
             resolved_entity_id = :resolved_entity_id,
             resolved_entity_type = :resolved_entity_type,
@@ -204,9 +243,13 @@ def insert_raw_messages(
             media_kind,
             edited_at,
             is_service_message,
+            forum_topic_id,
+            forum_topic_top_message_id,
+            reply_to_top_message_id,
+            is_forum_topic_message,
             raw_json,
             created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
@@ -224,6 +267,10 @@ def insert_raw_messages(
                 row.media_kind,
                 row.edited_at.isoformat() if row.edited_at else None,
                 int(row.is_service_message),
+                row.forum_topic_id,
+                row.forum_topic_top_message_id,
+                row.reply_to_top_message_id,
+                int(row.is_forum_topic_message),
                 row.raw_json,
                 utc_now(),
             )
@@ -242,6 +289,68 @@ def list_raw_messages(connection: sqlite3.Connection, run_id: str) -> List[sqlit
         FROM raw_messages
         WHERE run_id = ?
         ORDER BY message_timestamp ASC, telegram_message_id ASC
+        """,
+        (run_id,),
+    ).fetchall()
+
+
+def insert_run_forum_topics(
+    connection: sqlite3.Connection, topic_snapshots: Iterable[ForumTopicSnapshot]
+) -> int:
+    rows = list(topic_snapshots)
+    if not rows:
+        return 0
+
+    before_changes = connection.total_changes
+    connection.executemany(
+        """
+        INSERT OR REPLACE INTO run_forum_topics(
+            run_id,
+            target_id,
+            forum_topic_id,
+            forum_topic_title,
+            forum_topic_top_message_id,
+            forum_topic_date,
+            unread_count,
+            unread_mentions_count,
+            unread_reactions_count,
+            is_pinned,
+            is_closed,
+            is_hidden,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                row.run_id,
+                row.target_id,
+                row.forum_topic_id,
+                row.forum_topic_title,
+                row.forum_topic_top_message_id,
+                row.forum_topic_date.isoformat(),
+                row.unread_count,
+                row.unread_mentions_count,
+                row.unread_reactions_count,
+                int(row.is_pinned),
+                int(row.is_closed),
+                int(row.is_hidden),
+                utc_now(),
+            )
+            for row in rows
+        ],
+    )
+    inserted = connection.total_changes - before_changes
+    connection.commit()
+    return inserted
+
+
+def list_run_forum_topics(connection: sqlite3.Connection, run_id: str) -> List[sqlite3.Row]:
+    return connection.execute(
+        """
+        SELECT *
+        FROM run_forum_topics
+        WHERE run_id = ?
+        ORDER BY forum_topic_date DESC, forum_topic_id ASC
         """,
         (run_id,),
     ).fetchall()
@@ -304,6 +413,25 @@ def get_generated_report(connection: sqlite3.Connection, run_id: str) -> Optiona
         "SELECT * FROM generated_reports WHERE run_id = ?",
         (run_id,),
     ).fetchone()
+
+
+def list_forum_topic_read_points(connection: sqlite3.Connection, run_id: str) -> List[sqlite3.Row]:
+    return connection.execute(
+        """
+        SELECT
+            forum_topic_id,
+            forum_topic_top_message_id,
+            MAX(telegram_message_id) AS highest_message_id,
+            COUNT(*) AS collected_message_count
+        FROM raw_messages
+        WHERE run_id = ?
+          AND forum_topic_id IS NOT NULL
+          AND forum_topic_top_message_id IS NOT NULL
+        GROUP BY forum_topic_id, forum_topic_top_message_id
+        ORDER BY forum_topic_top_message_id ASC
+        """,
+        (run_id,),
+    ).fetchall()
 
 
 def delete_raw_messages(connection: sqlite3.Connection, run_id: str) -> int:

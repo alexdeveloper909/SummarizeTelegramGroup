@@ -1,8 +1,8 @@
 # Project Overview
 
-This repository is an automation-friendly workspace for generating daily reports from Telegram groups or channels. The intended runtime is an AI coding agent or agent CLI that can execute local scripts, inspect stored message data, optionally perform web research for deeper context, produce a concise morning report, and optionally deliver an already-written report back into Telegram when explicitly requested.
+This repository is an automation-friendly workspace for generating daily reports from Telegram groups, channels, or forums. The intended runtime is an AI coding agent or agent CLI that can execute local scripts, inspect stored message data, optionally perform web research for deeper context, produce a concise morning report, and optionally deliver an already-written report back into Telegram when explicitly requested.
 
-The current repository includes a first working version of the local pipeline: Telethon auth/bootstrap, SQLite-backed collection and staging, summary-input preparation, report persistence, retry-safe finalization, an opt-in report-delivery script, and supporting test coverage.
+The current repository includes a working local pipeline: Telethon auth/bootstrap, SQLite-backed collection and staging, summary-input preparation for both flat chats and forums, report persistence, retry-safe finalization, an opt-in report-delivery script, and supporting test coverage.
 
 The near-term optimization direction is to keep summarization selective without hard-coding domain-specific heuristics into the preparation step.
 The current reporting flow now includes a dedicated report-writing brief so the summarizer can start from a clear generic contract before reading the full message chronology.
@@ -13,6 +13,7 @@ Generated report artifacts now live under dated directories in `data/reports/DD.
 
 - [README.md](README.md): short project entry point
 - [docs/specification.md](docs/specification.md): authoritative product and implementation specification
+- [docs/forum_support_specification.md](docs/forum_support_specification.md): forum-specific collection, bundle, and finalization contract
 - [user_guide.md](user_guide.md): human setup, auth, execution, and troubleshooting guide
 - [AGENTS.md](AGENTS.md): agent-facing operating instructions for this repository
 - [docs/architecture.md](docs/architecture.md): component and storage design
@@ -22,9 +23,11 @@ Generated report artifacts now live under dated directories in `data/reports/DD.
 ## Implemented Deliverables
 
 - Python scripts using Telethon to collect Telegram messages
+- Forum-aware collection that snapshots active topics and preserves topic-thread metadata
 - SQLite storage for per-run message staging and report metadata
-- Agent-friendly scripts and prompts for summarization and report writing
+- Agent-friendly scripts and prompts for summarization and report writing across flat chats and forums
 - A report workflow that favors high-signal items over raw chronological replay
+- Topic-aware forum finalization that acknowledges only the collected discussion threads
 - A dated on-disk artifact layout that keeps summary bundles, prompts, drafts, and stored reports separated
 - An explicit Markdown-to-Telegram delivery path for posting finalized reports into a chosen chat
 - Cleanup and read-state handling so each automation run finishes in a consistent state
@@ -37,6 +40,7 @@ Generated report artifacts now live under dated directories in `data/reports/DD.
 - Separate data collection from summarization so collection can be tested independently
 - Optimize the summarization stage for highlighting signal over exhaustive recap
 - Prefer explicit run identifiers and target identifiers over implicit global state
+- Preserve topic boundaries for forum runs so one report can summarize cross-topic activity cleanly
 - Keep Telegram secrets in environment variables or local ignored env files such as `.secrets/telegram.env`
 - Allow auth bootstrap to source the Telegram phone number from local config to reduce interactive setup friction
 - Allow auth bootstrap to source the Telegram 2FA password from local config when two-step verification is enabled
