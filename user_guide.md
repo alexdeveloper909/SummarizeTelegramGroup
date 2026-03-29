@@ -131,7 +131,7 @@ When writing the final report, prefer these rules:
 - do not recap everything; focus on the most important information
 - preserve concrete details only when they materially improve usefulness or accuracy
 - collapse repetition when several messages describe the same situation
-- if the stream contains conflicting or weakly supported claims, keep the main report conservative and note uncertainty clearly
+- if the stream contains conflicting or weakly supported claims, keep the main report conservative
 
 ## Sending a Stored Report to Telegram
 
@@ -206,10 +206,6 @@ One short paragraph describing why these signals deserve attention.
 ## Action items or follow-ups
 
 - Practical next steps for the user
-
-## Low-confidence items or uncertainties
-
-- Claims that may be true but were not verified
 ```
 
 ## Retry and Recovery

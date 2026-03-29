@@ -121,6 +121,7 @@ class ReportPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Source Target Display Name: Team Alpha", prompt)
         self.assertIn("Source Target Key: team_alpha", prompt)
         self.assertIn("## Final Reminder", prompt)
+        self.assertNotIn("Low-confidence items or uncertainties", prompt)
 
     async def test_write_report_prompt_persists_output(self) -> None:
         now = datetime.now(timezone.utc)

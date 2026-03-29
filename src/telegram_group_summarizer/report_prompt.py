@@ -5,7 +5,6 @@ from typing import Optional
 
 from .models import SummaryBundle
 
-
 DEFAULT_REPORT_LANGUAGE = "Ukrainian"
 
 
@@ -25,10 +24,13 @@ def build_report_prompt(
         "",
         "## Output Contract",
         f"- Language: {report_language}",
-        "- Start the report with one source line that names the Telegram group or channel being summarized.",
+        (
+            "- Start the report with one source line that names the Telegram group or "
+            "channel being summarized."
+        ),
         "- Be concise, structured, and useful.",
         "- Decide from the prepared bundle what matters most.",
-        "- Distinguish well-supported points from uncertain or conflicting claims.",
+        "- Keep the report conservative when evidence is weak or conflicting.",
         "",
         "## Required Sections",
         "1. Headline summary",
@@ -36,7 +38,6 @@ def build_report_prompt(
         "3. Key topics and signals",
         "4. Important links",
         "5. Action items or follow-ups",
-        "6. Low-confidence items or uncertainties",
         "",
         "## Reading Order",
         "1. Run Metadata",
@@ -45,7 +46,10 @@ def build_report_prompt(
         "4. Full Chronological Messages",
         "",
         "## Report Rules",
-        "- Work from the prepared bundle and decide what is important without relying on pre-labeled signals.",
+        (
+            "- Work from the prepared bundle and decide what is important without relying "
+            "on pre-labeled signals."
+        ),
         "- Preserve concrete details when they materially improve the report.",
         "- If claims are weak, disputed, or incomplete, say so clearly.",
         "- Keep the report readable and avoid unnecessary detail.",
@@ -79,7 +83,10 @@ def build_report_prompt(
             "",
             "## Final Reminder",
             "- If the bundle is empty or low-value, say so plainly.",
-            "- Do not omit the source target; the final report must clearly say which Telegram group or channel it covers.",
+            (
+                "- Do not omit the source target; the final report must clearly say "
+                "which Telegram group or channel it covers."
+            ),
             "- Use the chronological messages to decide what is important.",
             "",
         ]

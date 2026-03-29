@@ -6,14 +6,12 @@ from typing import Optional
 from .config import AppConfig
 from .db import create_generated_report, get_run_with_target, update_run_status
 
-
 REPORT_SECTION_TITLES = [
     "Headline summary",
     "Why this matters",
     "Key topics and signals",
     "Important links",
     "Action items or follow-ups",
-    "Low-confidence items or uncertainties",
 ]
 
 

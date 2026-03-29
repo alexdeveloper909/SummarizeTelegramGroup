@@ -365,7 +365,6 @@ The report format should include:
 3. Key topics and signals
 4. Important links
 5. Action items or follow-ups
-6. Low-confidence items or uncertainties
 
 ## 15. Automation Contract
 
