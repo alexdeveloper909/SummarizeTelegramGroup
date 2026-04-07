@@ -159,6 +159,8 @@ class ReportPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Source Target Display Name: Team Alpha", prompt)
         self.assertIn("Source Target Key: team_alpha", prompt)
         self.assertIn("## Final Reminder", prompt)
+        self.assertIn("2. Key topics and signals", prompt)
+        self.assertNotIn("Why this matters", prompt)
         self.assertNotIn("Cross-topic developments", prompt)
 
     async def test_forum_report_prompt_injects_cross_topic_guidance(self) -> None:
@@ -216,6 +218,7 @@ class ReportPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Forum Overview", prompt)
         self.assertIn("Topic Radar", prompt)
         self.assertIn("one report for the whole forum", prompt)
+        self.assertNotIn("Why this matters", prompt)
 
     async def test_write_report_prompt_persists_output(self) -> None:
         now = datetime.now(timezone.utc)

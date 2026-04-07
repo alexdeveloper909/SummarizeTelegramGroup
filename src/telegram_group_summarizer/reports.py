@@ -9,11 +9,12 @@ from .report_layout import default_report_path
 
 REPORT_SECTION_TITLES = [
     "Headline summary",
-    "Why this matters",
     "Key topics and signals",
     "Important links",
     "Action items or follow-ups",
 ]
+
+
 def store_report(
     connection,
     *,

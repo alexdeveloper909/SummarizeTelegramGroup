@@ -278,12 +278,11 @@ The report should:
 Recommended report structure:
 
 1. Headline summary
-2. Why this matters
-3. Cross-topic developments
-4. Notable topic threads
-5. Important links
-6. Actions, requests, decisions, or deadlines
-7. Uncertainties if needed
+2. Cross-topic developments
+3. Notable topic threads
+4. Important links
+5. Actions, requests, decisions, or deadlines
+6. Uncertainties if needed
 
 The current generic prompt can stay as the base, but forum mode should inject forum-specific reading order and compression rules.
 

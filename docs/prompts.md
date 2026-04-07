@@ -9,10 +9,9 @@ Source line before the sections:
 - Prefer the prepared target metadata, for example `Source target: Team Alpha (channel, target key: team_alpha)`.
 
 1. Headline summary
-2. Why this matters
-3. Key topics and signals
-4. Important links
-5. Action items or follow-ups
+2. Key topics and signals
+3. Important links
+4. Action items or follow-ups
 
 ## Prompt Skeleton
 
@@ -28,10 +27,9 @@ Goals:
 Output format:
 Source target line naming the Telegram group or channel.
 1. Headline summary
-2. Why this matters
-3. Key topics and signals
-4. Important links
-5. Action items or follow-ups
+2. Key topics and signals
+3. Important links
+4. Action items or follow-ups
 
 Rules:
 - Work only from the prepared bundle unless web research is explicitly justified.

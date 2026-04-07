@@ -227,10 +227,6 @@ Source target: Team Alpha (channel, target key: team_alpha)
 
 Two or three sentences on the most useful outcomes from the chat.
 
-## Why this matters
-
-One short paragraph describing why these signals deserve attention.
-
 ## Key topics and signals
 
 - Important developments or noteworthy themes from the message stream

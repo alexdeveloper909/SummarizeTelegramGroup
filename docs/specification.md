@@ -371,10 +371,9 @@ Prepared input should include:
 The report format should include:
 
 1. Headline summary
-2. Why this matters
-3. Key topics and signals
-4. Important links
-5. Action items or follow-ups
+2. Key topics and signals
+3. Important links
+4. Action items or follow-ups
 
 ## 15. Automation Contract
 
