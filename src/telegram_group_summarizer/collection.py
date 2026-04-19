@@ -24,6 +24,7 @@ USERNAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,}$")
 DEFAULT_FORUM_TOPIC_PROBE_MESSAGES = 3
 DEFAULT_FORUM_MAX_MESSAGES_PER_TOPIC = 50
 VALID_TARGET_MODES = {"auto", "chat", "forum"}
+VALID_COLLECTION_STRATEGIES = {"unread-first", "lookback-only"}
 
 
 @dataclass(frozen=True)
@@ -260,8 +261,15 @@ def normalize_forum_topic_snapshot(
     )
 
 
-def is_active_forum_topic(topic: ForumTopicSnapshot, cutoff: datetime) -> bool:
-    return topic.forum_topic_date >= cutoff or topic.unread_count > 0
+def is_active_forum_topic(
+    topic: ForumTopicSnapshot,
+    cutoff: datetime,
+    *,
+    include_unread_signals: bool = True,
+) -> bool:
+    return topic.forum_topic_date >= cutoff or (
+        include_unread_signals and topic.unread_count > 0
+    )
 
 
 def _filter_by_cutoff(messages: Sequence[Any], cutoff: datetime) -> List[Any]:
@@ -291,15 +299,28 @@ def _slice_recent_messages(messages: Sequence[Any], *, cutoff: datetime, limit: 
     return deduped[-limit:]
 
 
-def _forum_topic_priority(topic: ForumTopicSnapshot, probe_message_count: int = 0) -> tuple:
+def _forum_topic_priority(
+    topic: ForumTopicSnapshot,
+    probe_message_count: int = 0,
+    *,
+    include_unread_signals: bool = True,
+) -> tuple:
     return (
-        topic.unread_count,
+        topic.unread_count if include_unread_signals else 0,
         int(topic.is_pinned),
         probe_message_count,
-        topic.unread_mentions_count,
-        topic.unread_reactions_count,
+        topic.unread_mentions_count if include_unread_signals else 0,
+        topic.unread_reactions_count if include_unread_signals else 0,
         topic.forum_topic_date,
     )
+
+
+def _validate_collection_strategy(collection_strategy: str) -> None:
+    if collection_strategy not in VALID_COLLECTION_STRATEGIES:
+        raise ValueError(
+            "collection_strategy must be one of "
+            f"{sorted(VALID_COLLECTION_STRATEGIES)}"
+        )
 
 
 def _resolve_target_mode(requested_target_mode: str, resolved_target: ResolvedTarget) -> str:
@@ -324,18 +345,21 @@ async def _collect_flat_target_messages(
     resolved_target: ResolvedTarget,
     cutoff: datetime,
     max_messages: int,
+    collection_strategy: str,
 ) -> tuple[str, List[Any]]:
-    unread_messages = await telegram_client.fetch_unread_messages(
-        resolved_target, limit=max_messages
-    )
+    _validate_collection_strategy(collection_strategy)
     collected_messages: List[Any] = []
     mode = "lookback"
 
-    if unread_messages is not None:
-        bounded_unread = _filter_by_cutoff(list(unread_messages), cutoff)
-        if bounded_unread:
-            collected_messages = bounded_unread[:max_messages]
-            mode = "unread"
+    if collection_strategy == "unread-first":
+        unread_messages = await telegram_client.fetch_unread_messages(
+            resolved_target, limit=max_messages
+        )
+        if unread_messages is not None:
+            bounded_unread = _filter_by_cutoff(list(unread_messages), cutoff)
+            if bounded_unread:
+                collected_messages = bounded_unread[:max_messages]
+                mode = "unread"
 
     if not collected_messages:
         lookback_messages = await telegram_client.fetch_messages_since(
@@ -358,7 +382,9 @@ async def _collect_forum_target_messages(
     cutoff: datetime,
     max_messages: int,
     forum_options: ForumCollectionOptions,
+    collection_strategy: str,
 ) -> tuple[List[ForumTopicSnapshot], List[ForumTopicSnapshot], List[NormalizedMessage]]:
+    _validate_collection_strategy(collection_strategy)
     raw_topics = await telegram_client.fetch_forum_topics(
         resolved_target, limit=forum_options.topic_limit
     )
@@ -368,8 +394,20 @@ async def _collect_forum_target_messages(
     ]
     insert_run_forum_topics(connection, topic_snapshots)
 
-    active_topics = [topic for topic in topic_snapshots if is_active_forum_topic(topic, cutoff)]
-    ranked_topics = sorted(active_topics, key=_forum_topic_priority, reverse=True)
+    include_unread_signals = collection_strategy == "unread-first"
+    active_topics = [
+        topic
+        for topic in topic_snapshots
+        if is_active_forum_topic(topic, cutoff, include_unread_signals=include_unread_signals)
+    ]
+    ranked_topics = sorted(
+        active_topics,
+        key=lambda topic: _forum_topic_priority(
+            topic,
+            include_unread_signals=include_unread_signals,
+        ),
+        reverse=True,
+    )
     collected_by_topic: Dict[int, List[Any]] = {}
     remaining_budget = max_messages
     probe_limit = min(
@@ -402,6 +440,7 @@ async def _collect_forum_target_messages(
             key=lambda topic: _forum_topic_priority(
                 topic,
                 probe_message_count=len(collected_by_topic.get(topic.forum_topic_id, [])),
+                include_unread_signals=include_unread_signals,
             ),
             reverse=True,
         )
@@ -461,6 +500,7 @@ async def collect_messages_for_run(
     run_id: Optional[str] = None,
     now: Optional[datetime] = None,
     target_mode: str = "auto",
+    collection_strategy: str = "unread-first",
     forum_topic_limit: Optional[int] = None,
     forum_topic_probe_messages: int = DEFAULT_FORUM_TOPIC_PROBE_MESSAGES,
     forum_max_messages_per_topic: int = DEFAULT_FORUM_MAX_MESSAGES_PER_TOPIC,
@@ -474,6 +514,7 @@ async def collect_messages_for_run(
         raise ValueError("forum_topic_probe_messages must be positive.")
     if forum_max_messages_per_topic <= 0:
         raise ValueError("forum_max_messages_per_topic must be positive.")
+    _validate_collection_strategy(collection_strategy)
 
     forum_options = ForumCollectionOptions(
         topic_limit=forum_topic_limit,
@@ -513,6 +554,7 @@ async def collect_messages_for_run(
                 cutoff=cutoff,
                 max_messages=max_messages,
                 forum_options=forum_options,
+                collection_strategy=collection_strategy,
             )
             mode = "forum"
             forum_topic_count = len(topic_snapshots)
@@ -523,6 +565,7 @@ async def collect_messages_for_run(
                 resolved_target=resolved_target,
                 cutoff=cutoff,
                 max_messages=max_messages,
+                collection_strategy=collection_strategy,
             )
             normalized_messages = [
                 normalize_message(run_id=active_run_id, target_id=target_id, message=message)

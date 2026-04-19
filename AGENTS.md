@@ -28,6 +28,7 @@ If implementation-specific docs are later added under `docs/`, prefer the most s
 - Keep data collection separate from summarization logic.
 - Do not add hidden constants for Telegram targets, secrets, or local paths.
 - Prefer explicit CLI arguments and environment variables.
+- For multi-target digests, keep target lists in an explicit JSON config file rather than hard-coding them into prompts or scripts.
 - Keep raw Telegram data retention minimal.
 - Do not mark Telegram messages as read until a report has been successfully produced.
 - For forum runs, never replace topic-scoped read acknowledgement with chat-wide read acknowledgement.
@@ -81,10 +82,16 @@ Standard local run flow:
 
 - `python3.12 scripts/auth_telegram.py`
 - `python3.12 scripts/collect_messages.py --target <target> --lookback-hours 24 --max-messages 500`
+- `python3.12 scripts/collect_messages.py --target <target> --collection-strategy lookback-only --lookback-hours 24 --max-messages 500`
 - `python3.12 scripts/prepare_report_context.py --run-id <run_id>`
 - Agent writes the final report and stores it with `python3.12 scripts/store_report.py --run-id <run_id> --input-path <report.md>`
 - `python3.12 scripts/finalize_run.py --run-id <run_id> --mark-read --purge-raw`
 - `python3.12 scripts/send_markdown_report.py --input-path <report.md> --target <target>`
+
+Multi-target digest helpers:
+
+- `python3.12 scripts/collect_digest_context.py --targets-config .secrets/daily_digest_targets.json`
+- `python3.12 scripts/build_consolidated_digest.py --manifest-path <manifest.json>`
 
 The lower-level scripts `prepare_summary_input.py` and `build_report_prompt.py` remain available for debugging or partial reruns.
 Use `python3.12 scripts/migrate_report_layout.py` when older flat files in `data/reports/` need to be normalized into the dated folder layout.
@@ -105,4 +112,5 @@ Minimum pre-merge validation:
 - For forum targets, preserve topic metadata in `run_forum_topics` and keep forum message rows annotated with topic IDs and topic root message IDs.
 - When preparing or reviewing report output, rely on the prepared bundle and let the model determine what matters.
 - When writing a final report, use the generated report prompt/brief before falling back to the full bundle.
+- For scheduled daily digests, prefer `lookback-only` collection so each run covers a deterministic time window instead of unread state.
 - When delivering a report to Telegram, use the dedicated delivery script and keep it opt-in; never wire it into the standard collection/store/finalize pipeline without explicit user approval.

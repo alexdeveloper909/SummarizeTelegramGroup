@@ -28,6 +28,12 @@ async def main() -> None:
         default="auto",
         help="Target handling mode. Auto-detect forums by default.",
     )
+    parser.add_argument(
+        "--collection-strategy",
+        choices=["unread-first", "lookback-only"],
+        default="unread-first",
+        help="Unread-first by default, or force deterministic lookback-only collection.",
+    )
     parser.add_argument("--lookback-hours", type=int, help="Lookback window in hours.")
     parser.add_argument("--max-messages", type=int, help="Maximum number of messages to collect.")
     parser.add_argument(
@@ -70,6 +76,7 @@ async def main() -> None:
             config=config,
             run_id=args.run_id,
             target_mode=args.target_mode,
+            collection_strategy=args.collection_strategy,
             forum_topic_limit=args.forum_topic_limit,
             forum_topic_probe_messages=args.forum_topic_probe_messages,
             forum_max_messages_per_topic=args.forum_max_messages_per_topic,

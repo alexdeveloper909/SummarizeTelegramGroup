@@ -22,6 +22,14 @@ flowchart TD
         J["Successful finalization: mark read + purge raw_messages"]
     end
 
+    subgraph MultiTarget["Multi-target Digest Helpers"]
+        M["collect_digest_context.py"]
+        N["digest manifest + prepared per-target context"]
+        O["Per-target agent reports"]
+        P["build_consolidated_digest.py"]
+        Q["full consolidated digest + publish brief"]
+    end
+
     T1 --> B
     B --> C
     C --> D
@@ -32,15 +40,21 @@ flowchart TD
     H --> I
     I --> J
     J --> T1
+    M --> N
+    N --> O
+    O --> P
+    P --> Q
 
     K["send_markdown_report.py"] --> T2
     H -. "explicit opt-in" .-> K
+    Q -. "explicit opt-in" .-> K
 ```
 
 ## Component Boundaries
 
 - `scripts/auth_telegram.py`: one-time interactive Telethon login bootstrap.
 - `scripts/collect_messages.py`: resolves one target, fetches unread-first with a lookback fallback, stages normalized rows, records run status, and snapshots forum-topic metadata for forum runs.
+- `scripts/collect_digest_context.py`: reads a JSON target list, logs into Telegram once, then sequentially collects and prepares per-target context for a multi-target digest while preserving partial failures.
 - `scripts/prepare_report_context.py`: preferred orchestration step that writes both the summary bundle and report-writing brief under the dated report artifact tree.
 - `scripts/prepare_summary_input.py`: builds an agent-friendly Markdown or JSON bundle from SQLite only.
 - `scripts/build_report_prompt.py`: converts the prepared bundle into a generic report-writing brief for the agent.
@@ -48,6 +62,7 @@ flowchart TD
 - `scripts/finalize_run.py`: refuses to finalize until a stored report exists, then marks the source target as read if requested and purges raw rows by `run_id`.
 - `scripts/purge_old_runs.py`: maintenance cleanup for old finalized runs.
 - `scripts/send_markdown_report.py`: separate manual delivery path for an already-written report; it does not change collection-run state.
+- `scripts/build_consolidated_digest.py`: reads a digest manifest, pulls stored per-target reports, writes one full consolidated document, and writes a separate publish-editing brief.
 
 ## Storage Model
 
@@ -74,3 +89,4 @@ This makes alias mapping explicit while still allowing direct one-off target ref
 - SQLite runs in WAL mode with a busy timeout.
 - Every raw row and cleanup action is scoped by `run_id`.
 - Shared Telethon session files can still be a concurrency bottleneck. Prefer one session file per worker or serialized Telegram access if multiple automations share an account.
+- For daily multi-target digests, prefer serialized Telegram collection with one shared session and parallelize only the summarization stage if needed.

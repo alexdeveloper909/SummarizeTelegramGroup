@@ -11,6 +11,18 @@
 `prepare_summary_input.py` and `build_report_prompt.py` remain available when you need to rerun only one part of the preparation stage.
 Default artifact locations are grouped under `data/reports/DD.MM.YYYY/` so one run day contains separate `summary/`, `report_prompt/`, `draft/`, `report/`, and `final/` folders.
 
+## Multi-Target Digest Runbook
+
+1. Create a local JSON config such as `.secrets/daily_digest_targets.json` from `config/daily_digest_targets.example.json`.
+2. Collect and prepare all targets with `python3 scripts/collect_digest_context.py --targets-config .secrets/daily_digest_targets.json`.
+3. Let the agent write and store one final report per prepared target.
+4. Finalize each successful run with `scripts/finalize_run.py --mark-read --purge-raw`.
+5. Build the full consolidated digest with `python3 scripts/build_consolidated_digest.py --manifest-path <manifest.json>`.
+6. Let the agent trim the full digest into a publish-ready version.
+7. Deliver the publish-ready Markdown explicitly with `scripts/send_markdown_report.py`.
+
+For scheduled daily digests, prefer `lookback-only` collection so the run covers a deterministic time window rather than unread state.
+
 ## Retry Paths
 
 ### Collection failure
@@ -61,6 +73,17 @@ Default artifact locations are grouped under `data/reports/DD.MM.YYYY/` so one r
 4. Let the model decide what matters from the prepared messages.
 5. Persist the report with store_report.py.
 6. Finalize only after the report write succeeds.
+
+### OpenClaw Daily Digest
+
+```text
+1. Run collect_digest_context.py with an explicit local targets config.
+2. Keep Telegram collection sequential so one shared Telethon session stays stable.
+3. Summarize each prepared target, store each report, and finalize each successful run.
+4. Build the full consolidated digest from the manifest.
+5. Run one final agent pass to shrink the consolidated digest for channel publication.
+6. Deliver the trimmed Markdown with send_markdown_report.py only when explicitly requested.
+```
 ```
 
 ## Pre-Merge Validation

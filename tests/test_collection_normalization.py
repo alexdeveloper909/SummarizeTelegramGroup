@@ -212,6 +212,53 @@ class CollectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("Unread update with https://example.com", staged_rows[0]["text_content"])
         self.assertEqual(0, staged_rows[0]["is_forum_topic_message"])
 
+    async def test_collect_messages_can_force_lookback_only_mode(self) -> None:
+        now = datetime.now(timezone.utc)
+        resolved_target = ResolvedTarget(
+            target_key="team_beta",
+            entity_id=998,
+            entity_type="channel",
+            display_name="Team Beta",
+            reference=TargetReference(kind="username", value="team_beta"),
+        )
+        unread_message = FakeMessage(
+            id=1,
+            date=now - timedelta(hours=1),
+            sender_id=10,
+            sender=FakeSender(first_name="Alice", last_name="Smith"),
+            text="Unread update that should be ignored",
+        )
+        lookback_message = FakeMessage(
+            id=2,
+            date=now - timedelta(minutes=10),
+            sender_id=11,
+            sender=FakeSender(first_name="Bob", last_name="Jones"),
+            text="Lookback update that should be kept",
+            unread=False,
+        )
+        client = FakeTelegramClient(
+            resolved_target,
+            unread_messages=[unread_message],
+            lookback_messages=[lookback_message],
+        )
+
+        result = await collect_messages_for_run(
+            connection=self.connection,
+            telegram_client=client,
+            target_value="team_beta",
+            lookback_hours=24,
+            max_messages=10,
+            config=self.config,
+            run_id="run-collect-lookback-only",
+            now=now,
+            collection_strategy="lookback-only",
+        )
+
+        self.assertEqual("lookback", result["mode"])
+        staged_rows = list_raw_messages(self.connection, "run-collect-lookback-only")
+        self.assertEqual(1, len(staged_rows))
+        self.assertEqual("Lookback update that should be kept", staged_rows[0]["text_content"])
+
     async def test_collect_messages_in_forum_mode_snapshots_and_stages_thread_metadata(
         self,
     ) -> None:

@@ -1,0 +1,21 @@
+{
+  "name": "Daily Telegram Digest",
+  "report_language": "Ukrainian",
+  "delivery_target": "<DELIVERY_CHANNEL_ID>",
+  "lookback_hours": 24,
+  "max_messages": 2000,
+  "collection_strategy": "lookback-only",
+  "targets": [
+    {
+      "target": "<GROUP_1_ID>",
+      "label": "Group 1",
+      "target_mode": "chat"
+    },
+    {
+      "target": "<FORUM_GROUP_ID>",
+      "label": "Forum Group",
+      "target_mode": "forum",
+      "forum_max_messages_per_topic": 75
+    }
+  ]
+}

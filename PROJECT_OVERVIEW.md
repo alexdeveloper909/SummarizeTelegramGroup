@@ -2,7 +2,7 @@
 
 This repository is an automation-friendly workspace for generating daily reports from Telegram groups, channels, or forums. The intended runtime is an AI coding agent or agent CLI that can execute local scripts, inspect stored message data, optionally perform web research for deeper context, produce a concise morning report, and optionally deliver an already-written report back into Telegram when explicitly requested.
 
-The current repository includes a working local pipeline: Telethon auth/bootstrap, SQLite-backed collection and staging, summary-input preparation for both flat chats and forums, report persistence, retry-safe finalization, an opt-in report-delivery script, and supporting test coverage.
+The current repository includes a working local pipeline: Telethon auth/bootstrap, SQLite-backed collection and staging, summary-input preparation for both flat chats and forums, report persistence, retry-safe finalization, an opt-in report-delivery script, helper scripts for multi-target digest collection and consolidation, and supporting test coverage.
 
 The near-term optimization direction is to keep summarization selective without hard-coding domain-specific heuristics into the preparation step.
 The current reporting flow now includes a dedicated report-writing brief so the summarizer can start from a clear generic contract before reading the full message chronology.
@@ -30,6 +30,7 @@ Generated report artifacts now live under dated directories in `data/reports/DD.
 - Topic-aware forum finalization that acknowledges only the collected discussion threads
 - A dated on-disk artifact layout that keeps summary bundles, prompts, drafts, and stored reports separated
 - An explicit Markdown-to-Telegram delivery path for posting finalized reports into a chosen chat
+- Multi-target digest helpers that collect targets sequentially, keep partial failures visible, and assemble one consolidated digest document
 - Cleanup and read-state handling so each automation run finishes in a consistent state
 - Documentation that supports both human operators and automation agents
 

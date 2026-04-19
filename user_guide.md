@@ -76,6 +76,16 @@ Collect unread messages first, with a lookback fallback:
 python3.12 scripts/collect_messages.py --target team_alpha --lookback-hours 24 --max-messages 500
 ```
 
+For scheduled digest runs where you want a strict time window instead of unread-state behavior, use:
+
+```bash
+python3.12 scripts/collect_messages.py \
+  --target team_alpha \
+  --collection-strategy lookback-only \
+  --lookback-hours 24 \
+  --max-messages 500
+```
+
 Forum-aware collection uses the same script:
 
 ```bash
@@ -109,6 +119,39 @@ Optional forum tuning flags:
 - `--forum-max-messages-per-topic`
 
 The collector prints a JSON payload including the `run_id`.
+
+## Multi-Target Digest Collection
+
+Create a local config from `config/daily_digest_targets.example.json`, for example `.secrets/daily_digest_targets.json`:
+
+```json
+{
+  "name": "Daily Telegram Digest",
+  "report_language": "Ukrainian",
+  "delivery_target": "<DELIVERY_CHANNEL_ID>",
+  "lookback_hours": 24,
+  "max_messages": 2000,
+  "collection_strategy": "lookback-only",
+  "targets": [
+    {"target": "<GROUP_1_ID>", "label": "Group 1", "target_mode": "chat"},
+    {"target": "<FORUM_GROUP_ID>", "label": "Forum Group", "target_mode": "forum"}
+  ]
+}
+```
+
+Then collect and prepare all targets with one login session:
+
+```bash
+python3.12 scripts/collect_digest_context.py --targets-config .secrets/daily_digest_targets.json
+```
+
+This writes a manifest JSON under `data/reports/DD.MM.YYYY/draft/` and, for each successful target, writes:
+
+- `summary/<RUN_ID>.summary.json`
+- `summary/<RUN_ID>.summary.md`
+- `report_prompt/<RUN_ID>.report_prompt.md`
+
+The manifest keeps partial failures visible so the agent can still produce a partial consolidated digest.
 
 ## Preparing Summary Input
 
@@ -179,7 +222,7 @@ Use it only when you explicitly want to deliver an already-written Markdown file
 ```bash
 python3.12 scripts/send_markdown_report.py \
   --input-path telegram_groups_consolidated_summary_2026-03-28.md \
-  --target -1003572938359
+  --target <DELIVERY_CHANNEL_ID>
 ```
 
 Behavior:
@@ -190,6 +233,25 @@ Behavior:
 - sends the chunks sequentially through the existing Telethon session
 
 The script does not alter collection-run state. It does not mark chats as read, purge raw rows, or auto-run after report generation.
+
+## Building the Full Consolidated Digest
+
+After per-target reports have been written and stored, build the consolidated full digest:
+
+```bash
+python3.12 scripts/build_consolidated_digest.py --manifest-path <MANIFEST_PATH>
+```
+
+This writes:
+
+- a full consolidated Markdown digest under `data/reports/DD.MM.YYYY/final/`
+- a publish-editing brief under `data/reports/DD.MM.YYYY/report_prompt/`
+
+Recommended pattern:
+
+1. keep the full consolidated file as the lossless internal digest
+2. let the agent create a shorter publish-ready Markdown from that full digest
+3. send only the publish-ready Markdown to Telegram
 
 ## Finalization
 

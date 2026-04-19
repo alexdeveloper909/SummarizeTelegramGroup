@@ -11,7 +11,9 @@ class ScriptEntrypointTests(unittest.TestCase):
         repo_root = Path(__file__).resolve().parents[1]
         scripts = [
             "scripts/auth_telegram.py",
+            "scripts/build_consolidated_digest.py",
             "scripts/build_report_prompt.py",
+            "scripts/collect_digest_context.py",
             "scripts/collect_messages.py",
             "scripts/finalize_run.py",
             "scripts/migrate_report_layout.py",
