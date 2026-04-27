@@ -46,11 +46,24 @@ def default_consolidated_prompt_path(reports_dir: Path, manifest: dict[str, Any]
     )
 
 
+def _prepared_target_has_collected_content(target: dict[str, Any], run) -> bool:
+    raw_message_count = target.get("message_count")
+    if raw_message_count is None and run is not None:
+        raw_message_count = run["message_count"]
+    if raw_message_count is None:
+        return True
+    try:
+        return int(raw_message_count) > 0
+    except (TypeError, ValueError):
+        return True
+
+
 def build_consolidated_markdown(connection, manifest: dict[str, Any]) -> str:
     started_at = _manifest_started_at(manifest)
     targets = manifest["targets"]
     included_sections: list[str] = []
     missing_sections: list[str] = []
+    skipped_empty_count = 0
 
     for target in targets:
         status = target.get("status")
@@ -69,6 +82,9 @@ def build_consolidated_markdown(connection, manifest: dict[str, Any]) -> str:
 
         report = get_generated_report(connection, run_id)
         run = get_run_with_target(connection, run_id)
+        if not _prepared_target_has_collected_content(target, run):
+            skipped_empty_count += 1
+            continue
         if report is None:
             missing_sections.append(f"- {label}: report has not been stored yet.")
             continue
@@ -104,6 +120,7 @@ def build_consolidated_markdown(connection, manifest: dict[str, Any]) -> str:
         f"- Report Language: {manifest.get('report_language', 'unknown')}",
         f"- Prepared Targets: {manifest.get('prepared_target_count', 0)}",
         f"- Failed Targets: {manifest.get('failed_target_count', 0)}",
+        f"- Empty Prepared Targets Skipped: {skipped_empty_count}",
     ]
     if manifest.get("delivery_target"):
         lines.append(f"- Delivery Target: {manifest['delivery_target']}")

@@ -104,10 +104,35 @@ class ConsolidationTests(unittest.IsolatedAsyncioTestCase):
             now=now,
             collection_strategy="lookback-only",
         )
+        empty_resolved_target = ResolvedTarget(
+            target_key="empty_forum",
+            entity_id=302,
+            entity_type="channel",
+            display_name="Empty Forum",
+            reference=TargetReference(kind="username", value="empty_forum"),
+        )
+        empty_client = FakeTelegramClient(empty_resolved_target, lookback_messages=[])
+        await collect_messages_for_run(
+            connection=self.connection,
+            telegram_client=empty_client,
+            target_value="empty_forum",
+            lookback_hours=48,
+            max_messages=10,
+            config=self.config,
+            run_id="run-empty-forum",
+            now=now,
+            collection_strategy="lookback-only",
+        )
         store_report(
             self.connection,
             run_id="run-group-one",
             report_markdown="# Headline summary\n\nGroup One did something important.",
+            config=self.config,
+        )
+        store_report(
+            self.connection,
+            run_id="run-empty-forum",
+            report_markdown="# Headline summary\n\nNo collected messages for this source.",
             config=self.config,
         )
 
@@ -118,7 +143,7 @@ class ConsolidationTests(unittest.IsolatedAsyncioTestCase):
             "delivery_target": "-100delivery",
             "lookback_hours": 48,
             "collection_strategy": "lookback-only",
-            "prepared_target_count": 1,
+            "prepared_target_count": 2,
             "failed_target_count": 1,
             "targets": [
                 {
@@ -129,6 +154,17 @@ class ConsolidationTests(unittest.IsolatedAsyncioTestCase):
                     "run_id": "run-group-one",
                     "resolved_target_key": "group_one",
                     "resolved_display_name": "Group One",
+                    "message_count": 1,
+                },
+                {
+                    "status": "prepared",
+                    "label": "Empty Forum",
+                    "target": "empty_forum",
+                    "target_mode": "forum",
+                    "run_id": "run-empty-forum",
+                    "resolved_target_key": "empty_forum",
+                    "resolved_display_name": "Empty Forum",
+                    "message_count": 0,
                 },
                 {
                     "status": "failed",
@@ -150,6 +186,9 @@ class ConsolidationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("# Consolidated Telegram Digest", markdown)
         self.assertIn("## Group One", markdown)
         self.assertIn("Group One did something important.", markdown)
+        self.assertIn("Empty Prepared Targets Skipped: 1", markdown)
+        self.assertNotIn("## Empty Forum", markdown)
+        self.assertNotIn("No collected messages for this source.", markdown)
         self.assertIn(
             "Broken Group: failed before report generation. Reason: Auth expired",
             markdown,
