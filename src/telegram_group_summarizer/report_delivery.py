@@ -156,6 +156,7 @@ async def send_markdown_report(
     telegram_client,
     target_value: str,
     markdown_text: str,
+    topic_id: Optional[int] = None,
     link_preview: bool = False,
     max_message_length: int = MAX_TELEGRAM_MESSAGE_UTF16,
     formatter: Optional[Formatter] = None,
@@ -177,6 +178,7 @@ async def send_markdown_report(
             chunk.text,
             formatting_entities=chunk.formatting_entities,
             link_preview=link_preview,
+            topic_id=topic_id,
         )
         message_id = getattr(sent_message, "id", None)
         if message_id is not None:
@@ -185,6 +187,7 @@ async def send_markdown_report(
     return {
         "target_key": resolved_target.target_key,
         "target_display_name": resolved_target.display_name,
+        "topic_id": topic_id,
         "chunk_count": len(chunks),
         "message_ids": sent_message_ids,
     }

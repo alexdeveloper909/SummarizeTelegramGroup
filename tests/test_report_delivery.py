@@ -72,7 +72,7 @@ class FakeDeliveryClient:
         self.references.append(reference)
         return ResolvedTarget(
             target_key=reference.value,
-            entity_id=-1003572938359,
+            entity_id=-1001234567890,
             entity_type="channel",
             display_name="Summary Reports",
             reference=reference,
@@ -85,6 +85,7 @@ class FakeDeliveryClient:
         *,
         formatting_entities=None,
         link_preview: bool = False,
+        topic_id: int | None = None,
     ):
         self.sent_messages.append(
             {
@@ -92,6 +93,7 @@ class FakeDeliveryClient:
                 "text": text,
                 "formatting_entities": tuple(formatting_entities or []),
                 "link_preview": link_preview,
+                "topic_id": topic_id,
             }
         )
         return SimpleNamespace(id=len(self.sent_messages))
@@ -205,8 +207,9 @@ class ReportDeliveryTests(unittest.IsolatedAsyncioTestCase):
         result = await send_markdown_report(
             connection=self.connection,
             telegram_client=fake_client,
-            target_value="-1003572938359",
+            target_value="-1001234567890",
             markdown_text="summary body",
+            topic_id=2,
             link_preview=True,
             max_message_length=64,
             formatter=(fake_convert, fake_split),
@@ -217,11 +220,13 @@ class ReportDeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("entity_id", fake_client.references[0].kind)
         self.assertEqual(2, len(fake_client.sent_messages))
         self.assertTrue(all(message["link_preview"] for message in fake_client.sent_messages))
+        self.assertTrue(all(message["topic_id"] == 2 for message in fake_client.sent_messages))
         self.assertEqual(
             ["Part one", "Part two"], [message["text"] for message in fake_client.sent_messages]
         )
         self.assertEqual([1, 2], result["message_ids"])
         self.assertEqual(2, result["chunk_count"])
+        self.assertEqual(2, result["topic_id"])
 
 
 if __name__ == "__main__":

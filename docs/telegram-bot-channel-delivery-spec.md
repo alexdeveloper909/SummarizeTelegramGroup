@@ -1,19 +1,19 @@
-# Telegram bot channel delivery migration spec
+# Telegram bot topic delivery migration spec
 
 Status: planned, not implemented
-Last updated: 2026-04-19
+Last updated: 2026-04-21
 
 ## Goal
 
-Change the daily digest publishing step so the final digest is posted to the Telegram channel by a **separate bot identity**, not by Alex's personal Telegram account.
+Change the daily digest publishing step so the final digest is posted to a **Telegram forum topic** by a **separate bot identity**, not by the operator's personal Telegram account.
 
 Primary reason:
 
-- posts sent by Alex's own account are treated as Alex's own activity
-- those posts often appear already read on Alex's phone
+- posts sent by the operator's own account are treated as the operator's own activity
+- those posts often appear already read on the operator's phone
 - Telegram therefore does not send a push notification for the newly published digest
 
-Using a bot identity should restore the normal subscriber experience: the channel receives a new post from the bot, and Alex's phone can notify him like any other channel subscriber.
+Using a bot identity should restore the normal subscriber experience: the destination chat receives a new post from the bot, and the operator's phone can notify him instead of treating the message as already read by his own account.
 
 ## Current state
 
@@ -39,7 +39,7 @@ Relevant files:
 
 Important boundary:
 
-- **collection and finalization should keep using Alex's user account**
+- **collection and finalization should keep using the operator's user account**
 - **only outbound digest publishing should move to the bot**
 
 That keeps read access and mark-read behavior unchanged.
@@ -50,7 +50,7 @@ Implement the first version with a **Telegram bot token plus a dedicated outboun
 
 Recommended technical shape:
 
-- keep **Telethon for collection/finalization** with Alex's user session
+- keep **Telethon for collection/finalization** with the operator's user session
 - add a **separate delivery mode for bot publishing**
 - prefer **Telethon bot login** for the first implementation to minimize code churn
 
@@ -62,14 +62,33 @@ Why this path:
 
 A later cleanup could switch outbound delivery to the pure Bot API if desired, but that is not required for the notification fix.
 
+## Destination change
+
+Replace the old delivery target with a forum topic.
+
+Old destination:
+
+- channel: `<OLD_DELIVERY_CHANNEL_ID>`
+- example link: `https://web.telegram.org/a/#<OLD_DELIVERY_CHANNEL_ID>`
+
+New destination:
+
+- supergroup / forum chat: `<DELIVERY_CHAT_ID>`
+- topic id: `<DELIVERY_TOPIC_ID>`
+- topic title: `<DELIVERY_TOPIC_NAME>`
+- example link: `https://web.telegram.org/a/#<DELIVERY_CHAT_ID>_<DELIVERY_TOPIC_ID>`
+
+The bot should publish the digest into that specific topic, not to the old broadcast channel.
+
 ## Expected result after migration
 
 When the cron job publishes the digest:
 
-- the message appears in the target channel as posted by the bot
-- Alex remains a normal subscriber to that channel
-- Alex's phone should receive the channel notification, assuming channel notifications are enabled on the phone and the channel is not muted
-- the message should no longer be auto-read purely because Alex's own account posted it
+- the message appears in the target forum topic as posted by the bot
+- the target topic is `<DELIVERY_TOPIC_NAME>` in chat `<DELIVERY_CHAT_ID>`
+- the operator remains a normal participant in that chat/topic
+- the operator's phone should receive the group/topic notification, assuming notifications are enabled on the phone and the chat/topic is not muted
+- the message should no longer be auto-read purely because the operator's own account posted it
 
 ## Non-goals
 
@@ -85,10 +104,10 @@ Before implementation day, these manual setup steps will be needed:
 
 1. Create a bot with `@BotFather`
 2. Save the bot token securely
-3. Add the bot to the destination channel
-4. Promote the bot to channel admin with permission to post messages
-5. Confirm the bot can post in the target channel
-6. Confirm Alex is subscribed to that same channel on the phone and notifications are enabled
+3. Add the bot to the destination supergroup
+4. Promote the bot so it can post in the forum topic
+5. Confirm the bot can post in the target topic
+6. Confirm the operator has notifications enabled for that chat/topic on the phone
 
 ## Proposed configuration changes
 
@@ -100,6 +119,8 @@ Suggested new env vars:
 TELEGRAM_DELIVERY_MODE=user
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_BOT_SESSION_NAME=telegram_group_summarizer_bot
+TELEGRAM_DELIVERY_CHAT_ID=<private destination chat id>
+TELEGRAM_DELIVERY_TOPIC_ID=<private forum topic id>
 ```
 
 Behavior:
@@ -108,6 +129,7 @@ Behavior:
 - `TELEGRAM_DELIVERY_MODE=bot` uses the bot identity for `send_markdown_report.py`
 - `TELEGRAM_BOT_TOKEN` is required when delivery mode is `bot`
 - `TELEGRAM_BOT_SESSION_NAME` is optional if Telethon bot sessions are used
+- `TELEGRAM_DELIVERY_CHAT_ID` and `TELEGRAM_DELIVERY_TOPIC_ID` keep deployment-specific destinations out of committed docs and cron commands
 
 Suggested secret file:
 
@@ -128,15 +150,19 @@ Add fields like:
 - `telegram_delivery_mode`
 - `telegram_bot_token`
 - `telegram_bot_session_name`
+- optional default delivery chat id
+- optional default delivery topic id
 
 Add validation helpers such as:
 
 - `validate_bot_delivery_credentials()`
+- `validate_topic_delivery_target()`
 
 Important:
 
 - do **not** make bot token required globally
 - only require it when the delivery path explicitly requests bot mode
+- only require topic-specific settings when topic delivery is requested
 
 ## 2. Add a dedicated outbound client factory
 
@@ -160,19 +186,23 @@ File:
 
 - `scripts/send_markdown_report.py`
 
-Change it so it selects the sender based on config or an explicit CLI flag.
+Change it so it selects the sender based on config or an explicit CLI flag, and supports sending into a specific forum topic.
 
 Preferred CLI shape:
 
 ```bash
-python3 scripts/send_markdown_report.py --input-path <report.md> --target <target> --sender bot
+python3 scripts/send_markdown_report.py --input-path <report.md> --target <chat_id> --topic-id <topic_id> --sender bot
 ```
 
 Suggested behavior:
 
 - `--sender user` means current behavior
 - `--sender bot` means outbound bot identity
+- `--topic-id` is optional for normal chats/channels, but required for forum-topic delivery
 - if `--sender` is omitted, fall back to `TELEGRAM_DELIVERY_MODE`
+- if `--target` is omitted, fall back to `TELEGRAM_DELIVERY_CHAT_ID`
+- if `--topic-id` is omitted, fall back to `TELEGRAM_DELIVERY_TOPIC_ID`
+- if a topic id is provided by CLI or env, delivery should send all report chunks into that forum topic thread
 
 This keeps manual testing simple and makes cron behavior explicit.
 
@@ -194,6 +224,7 @@ That behavior should stay the same.
 Needed verification:
 
 - confirm the current Telethon entity types and send path work correctly under a bot-authenticated Telethon client
+- confirm topic-thread delivery works correctly for multi-chunk output
 - if not, adapt only the outbound send layer, not the report building logic
 
 ## 5. Update cron job command
@@ -204,13 +235,13 @@ Current final step inside the daily digest automation:
 python3 scripts/send_markdown_report.py --input-path <CONSOLIDATED_REPORT_PATH> --target <DELIVERY_CHANNEL_ID>
 ```
 
-Target future form:
+Target future form, with destination kept in local env/secrets:
 
 ```bash
-python3 scripts/send_markdown_report.py --input-path <CONSOLIDATED_REPORT_PATH> --target <DELIVERY_CHANNEL_ID> --sender bot
+python3 scripts/send_markdown_report.py --input-path <CONSOLIDATED_REPORT_PATH> --sender bot
 ```
 
-This should be the only automation behavior change required in the digest flow.
+This should be the only automation behavior change required in the digest flow, aside from switching to the new destination.
 
 ## 6. Documentation updates
 
@@ -224,6 +255,7 @@ Document clearly that:
 
 - source-chat collection still uses user auth
 - outbound publication can use a bot
+- the delivery target is now a forum topic
 - the two identities are intentionally separate
 
 ## Implementation checklist
@@ -232,16 +264,21 @@ Document clearly that:
 
 - [ ] Create bot in `@BotFather`
 - [ ] Store bot token in local secrets
-- [ ] Add bot to destination channel
-- [ ] Grant posting rights
-- [ ] Confirm target channel ID is still correct
+- [ ] Add bot to destination supergroup
+- [ ] Grant rights needed to post in the forum topic
+- [ ] Confirm target chat id is `<DELIVERY_CHAT_ID>`
+- [ ] Confirm topic id is `<DELIVERY_TOPIC_ID>`
+- [ ] Confirm topic title is `<DELIVERY_TOPIC_NAME>`
 
 ### Code
 
 - [ ] Extend config with bot-delivery settings
+- [ ] Add topic-target settings or CLI support for forum delivery
 - [ ] Add bot-client factory
 - [ ] Add `--sender {user,bot}` to `send_markdown_report.py`
+- [ ] Add `--topic-id <id>` to `send_markdown_report.py`
 - [ ] Route delivery through user or bot sender accordingly
+- [ ] Route delivery into the correct forum topic when `--topic-id` is provided
 - [ ] Keep current chunking behavior intact
 - [ ] Add clear error message when bot mode is requested without token
 
@@ -249,7 +286,8 @@ Document clearly that:
 
 - [ ] Add config tests for bot settings
 - [ ] Add delivery tests covering sender selection
-- [ ] Add fake-client test that verifies chunked sends still happen in order
+- [ ] Add delivery tests covering topic-target selection
+- [ ] Add fake-client test that verifies chunked sends still happen in order inside the topic thread
 - [ ] Add a regression test proving user mode remains unchanged
 
 ### Docs
@@ -257,6 +295,7 @@ Document clearly that:
 - [ ] Update setup guide
 - [ ] Update agent guidance
 - [ ] Document secrets layout and operational steps
+- [ ] Document forum-topic target details
 
 ## Acceptance criteria
 
@@ -264,14 +303,14 @@ The migration is done when all of the following are true:
 
 1. The digest can still be collected, summarized, stored, and finalized exactly as before
 2. The final publish step can be run with bot sender mode
-3. The bot successfully posts the digest into the target channel
-4. Alex's own Telegram account is no longer the sender of the digest post
-5. Alex's phone receives a normal notification for the new channel post, assuming local notification settings allow it
+3. The bot successfully posts the digest into chat `<DELIVERY_CHAT_ID>`, topic `<DELIVERY_TOPIC_ID>` (`<DELIVERY_TOPIC_NAME>`)
+4. the operator's own Telegram account is no longer the sender of the digest post
+5. the operator's phone receives a normal notification for the new topic post, assuming local notification settings allow it
 6. Existing user-mode delivery remains available for fallback/debugging
 
 ## Risks and edge cases
 
-### 1. Bot lacks channel rights
+### 1. Bot lacks group/topic rights
 
 Symptom:
 
@@ -279,18 +318,19 @@ Symptom:
 
 Mitigation:
 
-- ensure the bot is channel admin with post permission before debugging code
+- ensure the bot is a member/admin with rights sufficient to post in the destination supergroup/topic before debugging code
 
-### 2. Private channel targeting issues
+### 2. Forum topic targeting issues
 
 Symptom:
 
-- bot cannot resolve or send to the target channel
+- bot posts to the main chat instead of the intended topic
+- bot cannot resolve the topic thread correctly
 
 Mitigation:
 
-- add the bot as a member/admin first
-- verify the channel target ID from a real test send
+- verify the chat id and topic id from a real test send
+- ensure the implementation uses the correct Telegram thread/topic targeting mechanism for forum messages
 
 ### 3. Formatting differences under bot sender mode
 
@@ -306,8 +346,8 @@ Mitigation:
 
 Possible causes after migration:
 
-- the channel is muted on the phone
-- iOS/Android Telegram notification settings suppress channel alerts
+- the group or topic is muted on the phone
+- iOS/Android Telegram notification settings suppress group/topic alerts
 - another Telegram client state issue exists independently of sender identity
 
 Mitigation:
@@ -318,7 +358,8 @@ Mitigation:
 
 If bot delivery misbehaves, rollback is simple:
 
-- switch cron back to `--sender user` or `TELEGRAM_DELIVERY_MODE=user`
+- switch cron back to `--sender user`
+- optionally revert the target back to the old channel if topic delivery is the part that fails
 - keep collection/finalization untouched
 - continue operating with the old user-posted behavior until bot delivery is fixed
 
@@ -327,7 +368,7 @@ If bot delivery misbehaves, rollback is simple:
 1. Create and prepare the bot in Telegram
 2. Add config support for bot credentials
 3. Add sender selection to `send_markdown_report.py`
-4. Test manual send to the target channel
+4. Test manual send to chat `<DELIVERY_CHAT_ID>`, topic `<DELIVERY_TOPIC_ID>`
 5. Update the cron command
 6. Run one live digest and confirm phone notification behavior
 
@@ -337,15 +378,15 @@ Not required for v1, but useful later:
 
 - support different delivery targets for staging vs production
 - add a small dry-run mode for delivery diagnostics
-- log sender identity explicitly in delivery output
+- log sender identity, chat id, and topic id explicitly in delivery output
 - optionally move bot delivery to pure Bot API in a later cleanup if we want stricter separation from MTProto user workflows
 
 ## Bottom line
 
 The smallest effective fix is:
 
-- keep reading Telegram as Alex
-- keep marking source chats as read as Alex
-- publish the final digest to the channel as a separate bot
+- keep reading Telegram as the operator
+- keep marking source chats as read as the operator
+- publish the final digest to the forum topic as a separate bot
 
 That should solve the main UX problem without forcing a redesign of the summarizer.

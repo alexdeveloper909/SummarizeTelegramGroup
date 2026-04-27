@@ -231,6 +231,42 @@ class TelethonWorkflowClientTests(unittest.IsolatedAsyncioTestCase):
             client.send_message_calls,
         )
 
+    async def test_send_text_message_uses_reply_to_for_topic_delivery(self) -> None:
+        client = FakeTelethonClient()
+        workflow_client = TelethonWorkflowClient(client)
+        target = ResolvedTarget(
+            target_key="-1001843781678",
+            entity_id=1843781678,
+            entity_type="channel",
+            display_name="Numeric Group",
+            reference=TargetReference(kind="target_key", value="-1001843781678"),
+        )
+
+        with patch(
+            "telegram_group_summarizer.telethon_client._build_topic_reply_object",
+            side_effect=lambda topic_id: ("reply", topic_id),
+        ):
+            await workflow_client.send_text_message(
+                target,
+                "Hello topic",
+                topic_id=2,
+            )
+
+        self.assertEqual([-1001843781678], client.get_input_entity_calls)
+        self.assertEqual(
+            [
+                (
+                    "input:-1001843781678",
+                    {
+                        "message": "Hello topic",
+                        "link_preview": False,
+                        "reply_to": ("reply", 2),
+                    },
+                )
+            ],
+            client.send_message_calls,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

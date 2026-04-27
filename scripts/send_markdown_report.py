@@ -20,6 +20,7 @@ from telegram_group_summarizer.report_delivery import (
     send_markdown_report,
 )
 from telegram_group_summarizer.telethon_client import TelethonWorkflowClient, create_telethon_client
+from telegram_group_summarizer.telethon_client import create_telethon_bot_client
 
 
 async def main() -> None:
@@ -29,10 +30,22 @@ async def main() -> None:
     parser.add_argument("--input-path", required=True, help="Path to the Markdown report to send.")
     parser.add_argument(
         "--target",
-        required=True,
-        help="Target key, username, or Telegram entity ID for the destination chat.",
+        help=(
+            "Target key, username, or Telegram entity ID for the destination chat. "
+            "Defaults to TELEGRAM_DELIVERY_CHAT_ID when omitted."
+        ),
     )
     parser.add_argument("--session-name", help="Override the default Telethon session file name.")
+    parser.add_argument(
+        "--sender",
+        choices=("user", "bot"),
+        help="Choose whether to send as the user account or the delivery bot.",
+    )
+    parser.add_argument(
+        "--topic-id",
+        type=int,
+        help="Forum topic id for topic-thread delivery.",
+    )
     parser.add_argument(
         "--link-preview",
         action="store_true",
@@ -47,27 +60,45 @@ async def main() -> None:
     args = parser.parse_args()
 
     config = load_config()
-    config.validate_telegram_credentials()
+    sender = args.sender or config.telegram_delivery_mode
+    target = args.target or config.telegram_delivery_chat_id
+    topic_id = args.topic_id if args.topic_id is not None else config.telegram_delivery_topic_id
+    if not target:
+        raise ValueError("Missing delivery target: pass --target or set TELEGRAM_DELIVERY_CHAT_ID.")
+    if sender == "bot":
+        config.validate_telegram_credentials()
+        config.validate_bot_delivery_credentials()
+        client = create_telethon_bot_client(config, session_name=args.session_name)
+    else:
+        config.validate_telegram_credentials()
+        client = create_telethon_client(config, session_name=args.session_name)
+
     configure_logging(config.log_level)
     connection = ensure_database(config)
     markdown_text = read_markdown_report(Path(args.input_path))
-
-    client = create_telethon_client(config, session_name=args.session_name)
-    async with client:
+    await client.connect()
+    try:
+        if sender == "bot":
+            await client.start(bot_token=config.telegram_bot_token)
         workflow_client = TelethonWorkflowClient(client)
         result = await send_markdown_report(
             connection=connection,
             telegram_client=workflow_client,
-            target_value=args.target,
+            target_value=target,
             markdown_text=markdown_text,
+            topic_id=topic_id,
             link_preview=args.link_preview,
             max_message_length=args.max_message_length,
         )
+    finally:
+        await client.disconnect()
 
     logging.getLogger(__name__).info(
         "Report delivery completed",
         extra={
             "target_key": result["target_key"],
+            "topic_id": result.get("topic_id"),
+            "sender": sender,
             "phase": "report_delivery",
             "status": "delivered",
         },

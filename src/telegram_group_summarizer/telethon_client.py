@@ -32,12 +32,36 @@ def _load_telethon_functions():
     return functions
 
 
+def _build_topic_reply_object(topic_id: int):
+    try:
+        from telethon import types
+    except ImportError as exc:
+        raise _missing_telethon_error(exc)
+    normalized_topic_id = int(topic_id)
+    return types.InputReplyToMessage(
+        reply_to_msg_id=normalized_topic_id,
+        top_msg_id=normalized_topic_id,
+    )
+
+
 def create_telethon_client(config: AppConfig, session_name: Optional[str] = None):
     telegram_client = _load_telethon_client()
     resolved_session_name = session_name or config.session_name
     session_path = config.sessions_dir / resolved_session_name
     session_path.parent.mkdir(parents=True, exist_ok=True)
     return telegram_client(str(session_path), config.telegram_api_id, config.telegram_api_hash)
+
+
+def create_telethon_bot_client(config: AppConfig, session_name: Optional[str] = None):
+    telegram_client = _load_telethon_client()
+    resolved_session_name = session_name or config.telegram_bot_session_name
+    session_path = config.sessions_dir / resolved_session_name
+    session_path.parent.mkdir(parents=True, exist_ok=True)
+    return telegram_client(
+        str(session_path),
+        config.telegram_api_id,
+        config.telegram_api_hash,
+    )
 
 
 class TelethonWorkflowClient:
@@ -185,6 +209,7 @@ class TelethonWorkflowClient:
         *,
         formatting_entities: Optional[Iterable[object]] = None,
         link_preview: bool = False,
+        topic_id: Optional[int] = None,
     ):
         input_entity = await self._input_entity(target)
         kwargs = {
@@ -193,4 +218,6 @@ class TelethonWorkflowClient:
         }
         if formatting_entities is not None:
             kwargs["formatting_entities"] = list(formatting_entities)
+        if topic_id is not None:
+            kwargs["reply_to"] = _build_topic_reply_object(topic_id)
         return await self.client.send_message(input_entity, **kwargs)

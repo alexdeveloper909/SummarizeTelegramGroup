@@ -9,6 +9,7 @@ DEFAULT_LOOKBACK_HOURS = 24
 DEFAULT_MAX_MESSAGES = 500
 DEFAULT_BUSY_TIMEOUT_MS = 5000
 DEFAULT_LOG_LEVEL = "INFO"
+DEFAULT_TELEGRAM_DELIVERY_MODE = "user"
 
 
 def _repo_root() -> Path:
@@ -19,6 +20,7 @@ def _load_local_env(repo_root: Path) -> Dict[str, str]:
     values: Dict[str, str] = {}
     candidates = [
         repo_root / ".secrets" / "telegram.env",
+        repo_root / ".secrets" / "telegram_bot.env",
         repo_root / ".env.local",
         repo_root / ".env",
     ]
@@ -82,6 +84,11 @@ class AppConfig:
     default_max_messages: int
     sqlite_busy_timeout_ms: int
     log_level: str
+    telegram_delivery_mode: str = DEFAULT_TELEGRAM_DELIVERY_MODE
+    telegram_bot_token: Optional[str] = None
+    telegram_bot_session_name: str = "telegram_group_summarizer_bot"
+    telegram_delivery_chat_id: Optional[str] = None
+    telegram_delivery_topic_id: Optional[int] = None
     telegram_phone: Optional[str] = None
     telegram_password: Optional[str] = None
 
@@ -94,6 +101,19 @@ class AppConfig:
         if missing:
             names = ", ".join(missing)
             raise ValueError(f"Missing required Telegram credentials: {names}")
+
+    def validate_bot_delivery_credentials(self) -> None:
+        if not self.telegram_bot_token:
+            raise ValueError(
+                "Missing required Telegram bot credential: TELEGRAM_BOT_TOKEN"
+            )
+
+    def validate_topic_delivery_target(self) -> None:
+        if self.telegram_delivery_chat_id and self.telegram_delivery_topic_id is None:
+            raise ValueError(
+                "TELEGRAM_DELIVERY_TOPIC_ID is required when TELEGRAM_DELIVERY_CHAT_ID is set "
+                "for forum-topic delivery."
+            )
 
 
 def load_config(repo_root: Optional[Path] = None) -> AppConfig:
@@ -112,6 +132,18 @@ def load_config(repo_root: Optional[Path] = None) -> AppConfig:
     )
     logs_dir = Path(_env_value("TELEGRAM_SUMMARIZER_LOGS_DIR", file_env) or root / "logs")
     session_name = _env_value("TELEGRAM_SESSION_NAME", file_env) or "telegram_group_summarizer"
+    telegram_delivery_mode = (
+        _env_value("TELEGRAM_DELIVERY_MODE", file_env) or DEFAULT_TELEGRAM_DELIVERY_MODE
+    ).lower()
+    telegram_bot_token = _env_value("TELEGRAM_BOT_TOKEN", file_env)
+    telegram_bot_session_name = (
+        _env_value("TELEGRAM_BOT_SESSION_NAME", file_env) or "telegram_group_summarizer_bot"
+    )
+    telegram_delivery_chat_id = _env_value("TELEGRAM_DELIVERY_CHAT_ID", file_env)
+    telegram_delivery_topic_id_raw = _env_value("TELEGRAM_DELIVERY_TOPIC_ID", file_env)
+    telegram_delivery_topic_id = (
+        int(telegram_delivery_topic_id_raw) if telegram_delivery_topic_id_raw is not None else None
+    )
 
     default_lookback_hours = _int_from_env(
         "TELEGRAM_SUMMARIZER_DEFAULT_LOOKBACK_HOURS",
@@ -145,6 +177,8 @@ def load_config(repo_root: Optional[Path] = None) -> AppConfig:
         raise ValueError("Default max messages must be positive.")
     if sqlite_busy_timeout_ms < 0:
         raise ValueError("SQLite busy timeout must be zero or positive.")
+    if telegram_delivery_mode not in {"user", "bot"}:
+        raise ValueError("TELEGRAM_DELIVERY_MODE must be either 'user' or 'bot'.")
 
     return AppConfig(
         repo_root=root,
@@ -154,6 +188,11 @@ def load_config(repo_root: Optional[Path] = None) -> AppConfig:
         logs_dir=logs_dir,
         telegram_api_id=_env_value("TELEGRAM_API_ID", file_env),
         telegram_api_hash=_env_value("TELEGRAM_API_HASH", file_env),
+        telegram_delivery_mode=telegram_delivery_mode,
+        telegram_bot_token=telegram_bot_token,
+        telegram_bot_session_name=telegram_bot_session_name,
+        telegram_delivery_chat_id=telegram_delivery_chat_id,
+        telegram_delivery_topic_id=telegram_delivery_topic_id,
         telegram_phone=_env_value("TELEGRAM_PHONE", file_env),
         telegram_password=_env_value("TELEGRAM_PASSWORD", file_env),
         session_name=session_name,
